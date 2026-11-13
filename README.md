@@ -121,9 +121,11 @@ TOP_P = 0.9
 ```
 QwenChat/
 ├── qwenchat/
+    |–– models/  here you would place your models
 │   ├── __init__.py
 │   ├── __main__.py
 │   ├── app.py
+    |–– backends.py
 │   ├── config.py
 │   ├── github_client.py
 │   ├── ui.py
