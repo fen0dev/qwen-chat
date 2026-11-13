@@ -32,8 +32,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/fen0dev/QwenChat.git
-cd QwenChat
+git clone https://github.com/fen0dev/qwen-chat.git
+cd qwen-chat
 
 # Create virtual environment (recommended)
 python3 -m venv .venv
