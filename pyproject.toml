@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "qwenchat"
+version = "0.1.0"
+description = "Beautiful terminal chat for Qwen3.8-27B-Uncensored-MLX with GitHub integration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "QwenChat Contributors"}
+]
+keywords = ["llm", "qwen", "mlx", "apple-silicon", "chat", "github"]
+dependencies = [
+    "mlx-vlm>=0.6.13",
+    "mlx>=0.32",
+    "huggingface_hub>=0.26.0",
+    "requests>=2.32.0",
+]
+
+[project.scripts]
+qwenchat = "qwenchat.__main__:main"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["qwenchat*"]
