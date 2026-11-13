@@ -1,6 +1,6 @@
 # QwenChat
 
-**Terminal chat for Qwen3.8-27B-Uncensored-MLX with conversation memory and GitHub integration.**
+**Terminal chat for Qwen3.8 and any other open-weight models with conversation memory and GitHub integration.**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue)
 ![License](https://img.shields.io/badge/License-MIT-green)
