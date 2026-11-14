@@ -30,3 +30,6 @@ Thumbs.db
 # Local token (never commit)
 .qwenchat_github_token
 *.token
+
+qwenchat.egg-info
+qwenchat.egg-*

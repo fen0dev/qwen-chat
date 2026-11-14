@@ -18,12 +18,18 @@ def _p(key: str, fallback: str = "") -> Path:
 DEEPSEEK_Q4_PATH: Final[Path] = _p("DEEPSEEK_Q4_PATH")
 LFM_Q4_PATH: Final[Path] = _p("LFM_Q4_PATH")
 QWEN_4BIT_PATH: Final[Path] = _p("QWEN_4BIT_PATH")
+QWEN_OPUS: Final[Path] = _p("QWEN_OPUS")
 
 MODELS: Final[Dict[str, Tuple[str, Path]]] = {
     # ---------- MLX models ----------
     "Qwen3.8-27B-Uncensored (4-bit MLX)": (
         "mlx",
         QWEN_4BIT_PATH,
+    ),
+
+    "Qwen3.6-40B-Claude-4.6-Opus-Uncensored (Q4_K_M)": (
+        "gguf",
+        QWEN_OPUS,
     ),
     
     # ---------- GGUF models ----------
