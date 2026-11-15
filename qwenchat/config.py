@@ -29,11 +29,11 @@ MODELS: Final[Dict[str, Tuple[str, Path]]] = {
         QWEN_4BIT_PATH,
     ),
 
-    "Qwen3.6-40B-Claude-4.6-Opus-Uncensored (Q4_K_M)": (
+    "Qwen3.6-40B-Claude-4.6-Opus-Uncensored (Q4_K_M) • Unavailable": (
         "gguf",
         QWEN_OPUS,
     ),
-    "Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M)": (
+    "Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M) • Unavailable": (
         "gguf",
         QWEN_FABLE,
     ),
