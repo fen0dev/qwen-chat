@@ -68,5 +68,10 @@ GITHUB_MAX_ISSUES: Final[int] = 15
 APP_NAME: Final[str] = "QwenChat"
 APP_VERSION: Final[str] = "0.2.0"
 
-#History
-HISTORY_DIR: Final[Path] = Path.home() / ".qwenchat" / "history"
+# History (override with QWENCHAT_HISTORY_DIR in .env.local if you want)
+_history = os.getenv("QWENCHAT_HISTORY_DIR", "").strip()
+HISTORY_DIR: Final[Path] = (
+    Path(_history).expanduser().resolve()
+    if _history
+    else Path.home() / ".qwenchat" / "history"
+)

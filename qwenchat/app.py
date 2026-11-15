@@ -26,11 +26,9 @@ from .backends import create_backend, BaseBackend
 from .conversation import Conversation
 from .session import GenerationParams
 from .input_queue import InputQueue
+from .config import HISTORY_DIR
 
 logger = logging.getLogger(__name__)
-
-HISTORY_DIR = Path.home() / ".qwenchat" / "history"
-HISTORY_DIR.mkdir(parents=True, exist_ok=True)
 
 def build_system_message(params: GenerationParams) -> dict:
     base = """
