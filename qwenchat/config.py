@@ -14,14 +14,16 @@ def _p(key: str, fallback: str = "") -> Path:
     return Path(value)
 
 # name → (backend, path)
+# Set these in your .env.local
 # backend must be "mlx" or "gguf"
 DEEPSEEK_Q4_PATH: Final[Path] = _p("DEEPSEEK_Q4_PATH")
 LFM_Q4_PATH: Final[Path] = _p("LFM_Q4_PATH")
 QWEN_4BIT_PATH: Final[Path] = _p("QWEN_4BIT_PATH")
 QWEN_OPUS: Final[Path] = _p("QWEN_OPUS")
+QWEN_FABLE: Final[Path] = _p("QWEN_FABLE")
 
 MODELS: Final[Dict[str, Tuple[str, Path]]] = {
-    # ---------- MLX models ----------
+    # ---------- main MLX and GGUF models ----------
     "Qwen3.8-27B-Uncensored (4-bit MLX)": (
         "mlx",
         QWEN_4BIT_PATH,
@@ -31,8 +33,12 @@ MODELS: Final[Dict[str, Tuple[str, Path]]] = {
         "gguf",
         QWEN_OPUS,
     ),
+    "Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M)": (
+        "gguf",
+        QWEN_FABLE,
+    ),
     
-    # ---------- GGUF models ----------
+    # ---------- other GGUF models ----------
     "LFM2.5-24B-A2B-Uncensored (Q4_K_M)": (
         "gguf",
         LFM_Q4_PATH,
@@ -58,5 +64,9 @@ GITHUB_TIMEOUT: Final[int] = 15
 GITHUB_MAX_REPOS: Final[int] = 30
 GITHUB_MAX_ISSUES: Final[int] = 15
 
+# App
 APP_NAME: Final[str] = "QwenChat"
-APP_VERSION: Final[str] = "0.1.0"
+APP_VERSION: Final[str] = "0.2.0"
+
+#History
+HISTORY_DIR: Final[Path] = Path.home() / ".qwenchat" / "history"

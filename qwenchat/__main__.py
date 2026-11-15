@@ -1,4 +1,4 @@
-"""Entry point."""
+"""Entry point for QwenChat."""
 
 from __future__ import annotations
 
@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 from typing import List, Tuple
 
-from .config import MODELS
+from .config import MODELS, APP_NAME, APP_VERSION
 from .ui import (
     C, clear_screen, print_banner, print_separator,
     print_error, print_info, print_success, print_warning,
@@ -24,6 +24,9 @@ def configure_logging() -> None:
 
 
 def find_available_models():
+    """
+    Returns list of (display_name, backend, path) for models that exist on disk.
+    """
     available = []
     for name, value in MODELS.items():
         if isinstance(value, (tuple, list)) and len(value) == 2:
@@ -31,15 +34,16 @@ def find_available_models():
         else:
             backend, path = "mlx", value
 
-        path = Path(path)
-        if path.exists():
+        path = Path(path).expanduser()
+        if path.exists() and path.stat().st_size > 0:
             available.append((name, backend, path))   # ← 3 items
     return available
 
 
 def prompt_model_selection():
     """
-    Shows menu and returns:
+    Interactive model picker
+    shows menu and returns:
         (display_name, backend, path)
     """
     available = find_available_models()
@@ -49,9 +53,11 @@ def prompt_model_selection():
 
     if available:
         for idx, (name, backend, path) in enumerate(available, start=1):
+            size_mb = path.stat().st_size / (1024 * 1024)
+            size_str = f"{size_mb:.0f} MB" if size_mb < 1024 else f"{size_mb/1024:.1f} GB"
             tag = f"[{backend.upper()}]"
             print(f"  {C.CYAN}{idx}{C.RESET}. {name}  {C.GRAY}{tag}{C.RESET}")
-            print(f"     {C.GRAY}{path}{C.RESET}")
+            print(f"     {C.GRAY}{path}  ({size_str}){C.RESET}")
     else:
         print_warning("  No pre-configured models found on disk.")
 
@@ -105,7 +111,8 @@ def main() -> None:
     configure_logging()
     clear_screen()
     print_banner()
-
+    print(f"{C.GRAY}{APP_NAME} v{APP_VERSION}{C.RESET}\n")
+    
     display_name, backend, model_path = prompt_model_selection()
 
     try:
