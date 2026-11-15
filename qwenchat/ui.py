@@ -88,6 +88,8 @@ def print_help() -> None:
         {C.CYAN}history{C.RESET}        → List saved conversations
         {C.CYAN}queue{C.RESET}          → Show queued messages
         {C.CYAN}/qclear{C.RESET}        → Clear the message queue
+        {C.CYAN}/prune{C.RESET}         → Delete session files older than 7 days
+        {C.CYAN}/resume{C.RESET}        → Show prior context (summary + active plans)
         {C.CYAN}github{C.RESET}         → Connect / reconnect GitHub
         {C.CYAN}/temp <f>{C.RESET}      → Set temperature
         {C.CYAN}/tokens <n>{C.RESET}    → Set max tokens
@@ -97,6 +99,9 @@ def print_help() -> None:
         {C.CYAN}/params{C.RESET}        → Show current generation params
         {C.CYAN}help{C.RESET}           → Show this help
         {C.CYAN}exit{C.RESET}           → Quit the chat
+
+        {C.YELLOW}Plan tools (model can call):{C.RESET}
+        create_plan, complete_step, complete_plan, list_plans
         """
     )
     

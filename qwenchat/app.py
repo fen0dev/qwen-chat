@@ -27,6 +27,11 @@ from .conversation import Conversation
 from .session import GenerationParams
 from .input_queue import InputQueue
 from .config import HISTORY_DIR
+from .history_store import (
+    ensure_history_dirs,
+    prune_old_sessions,
+    build_resume_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +63,12 @@ def build_system_message(params: GenerationParams) -> dict:
     - Use short sections or bullet points when they improve clarity.
     - When showing code, show only the relevant parts unless a full file is necessary.
     - When recommending a change, explain why, not just what.
+
+    Plans:
+    - For multi-step work that must survive across sessions, use the create_plan tool.
+    - When a step is finished, call complete_step.
+    - When the whole plan is finished, call complete_plan (this DELETES the plan from disk to free up space).
+    - Do not leave finished plans open. Completion must be explicit via tools.
 
     Tool use:
     - Use GitHub tools when repository context is needed.
@@ -246,6 +257,22 @@ def run(
     print_banner(model_name)
     print_separator()
 
+    ensure_history_dirs()
+    pruned = prune_old_sessions()
+    if pruned:
+        print_info(f"Pruned {pruned} sessions file(s) older than a week 🥵")
+
+    resume = build_resume_context()
+    #inject into system message once
+    system_message = build_system_message(params)
+    if resume:
+        system_message = {
+            "role": "system",
+            "content": system_message["content"] + "\n\n" + resume,
+        }
+
+        print_info("👻 loaded prior context (summary + active plans).")
+
     # ------------------------------------------------------------------
     # GitHub
     # ------------------------------------------------------------------
@@ -358,6 +385,19 @@ def run(
                     print(f"{C.YELLOW}Saved conversations:{C.RESET}")
                     for f in files[:15]:
                         print(f"  {f.name}")
+                continue
+
+            if cmd in {"/prune", "prune"}:
+                n = prune_old_sessions()
+                print_success(f"✓ Pruned {n} old session file(s)")
+                continue
+
+            if cmd in {"/resume", "resume"}:
+                resume = build_resume_context()
+                if not resume:
+                    print_info("No prior context.")
+                else:
+                    print(resume)
                 continue
 
             if cmd in {"/queue", "queue"}:
