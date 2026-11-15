@@ -28,25 +28,13 @@ MODELS: Final[Dict[str, Tuple[str, Path]]] = {
         "mlx",
         QWEN_4BIT_PATH,
     ),
-
-    "Qwen3.6-40B-Claude-4.6-Opus-Uncensored (Q4_K_M)": (
-        "gguf",
-        QWEN_OPUS,
-    ),
     "Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M)": (
         "gguf",
         QWEN_FABLE,
     ),
-    
-    # ---------- other GGUF models ----------
     "LFM2.5-24B-A2B-Uncensored (Q4_K_M)": (
         "gguf",
         LFM_Q4_PATH,
-    ),
-
-    "DeepSeek-V4-Pro-Qwen3.5-9B-Heretic (Q4_K_M)": (
-        "gguf",
-        DEEPSEEK_Q4_PATH,
     ),
 }
 
@@ -75,3 +63,10 @@ HISTORY_DIR: Final[Path] = (
     if _history
     else Path.home() / ".qwenchat" / "history"
 )
+
+SESSION_DIR: Final[Path] = HISTORY_DIR / "sessions"
+PLANS_DIR: Final[Path] = HISTORY_DIR / "plans"
+SUMMARY_PATH: Final[Path] = HISTORY_DIR / "summaries" / "rolling.json"
+
+SESSION_TTLS_DAYS: Final[int] = 7
+ROLLING_SUMMARY_MAX_CHARS: Final[int] = 4000

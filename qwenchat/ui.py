@@ -88,15 +88,22 @@ def print_help() -> None:
         {C.CYAN}history{C.RESET}        → List saved conversations
         {C.CYAN}queue{C.RESET}          → Show queued messages
         {C.CYAN}/qclear{C.RESET}        → Clear the message queue
+        {C.CYAN}/prune{C.RESET}         → Delete session files older than 7 days
+        {C.CYAN}/resume{C.RESET}        → Show prior context (summary + active plans)
         {C.CYAN}github{C.RESET}         → Connect / reconnect GitHub
-        {C.CYAN}/temp <f>{C.RESET}      → Set temperature
-        {C.CYAN}/tokens <n>{C.RESET}    → Set max tokens
-        {C.CYAN}/top_p <f>{C.RESET}     → Set top_p
         {C.CYAN}/think on|off{C.RESET}  → Toggle visible reasoning
-        {C.CYAN}/rounds <n>{C.RESET}    → Max tool-call rounds
         {C.CYAN}/params{C.RESET}        → Show current generation params
-        {C.CYAN}help{C.RESET}           → Show this help
         {C.CYAN}exit{C.RESET}           → Quit the chat
+
+        {C.YELLOW}Plan mode (model can use and call tools):{C.RESET}
+        create_plan, complete_step, complete_plan, list_plans
+
+        {C.ITALIC}You can also edit temperature, top_p, tokens, 
+        max tool rounds by typing:{C.RESET}
+            /temp 0.7
+            /tokens 1024
+            /top_p 0.9
+            /rounds 5
         """
     )
     

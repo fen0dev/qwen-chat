@@ -39,7 +39,7 @@ class MLXBackend(BaseBackend):
         self.model, self.processor = load(str(model_path))
         self.config = load_config(str(model_path))
         self._generate = generate
-        self.stream_generate = stream_generate
+        self._stream_generate = stream_generate
         self._apply_chat_template = apply_chat_template
 
     def _build_prompt(self, messages: List[Dict[str, str]]) -> str:
@@ -91,6 +91,7 @@ class MLXBackend(BaseBackend):
             if text:
                 yield text
 
+    @staticmethod
     def _extract_text(result: Any):
         if result is None:
             return ""
@@ -161,7 +162,7 @@ class GGUFBackend(BaseBackend):
         temperature: float,
         top_p: float,
     ):
-        stream = self.llm_create_chat_completion(
+        stream = self.llm.create_chat_completion(
             messages=messages,
             max_tokens=max_tokens,
             temperature=temperature,

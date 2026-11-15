@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -27,8 +28,83 @@ from .conversation import Conversation
 from .session import GenerationParams
 from .input_queue import InputQueue
 from .config import HISTORY_DIR
+from .history_store import (
+    ensure_history_dirs,
+    prune_old_sessions,
+    build_resume_context,
+    list_active_plans,
+)
 
 logger = logging.getLogger(__name__)
+
+PRESETS = {
+    "coding": """
+    You are a senior software engineer. Your job is to produce correct, minimal, production-quality code changes.
+
+    Rules:
+    - Prefer the smallest change that solves the problem cleanly.
+    - Do not invent APIs, files, or behavior. If you have not verified something, say so.
+    - Match existing style, naming, and abstractions.
+    - When proposing code, show only the relevant parts unless a full file is necessary.
+    - Call out risks, edge cases, and what should be tested.
+    - If the request is underspecified, ask for the missing constraint instead of guessing.
+    - Use tools when repository evidence is required. Do not guess file contents.
+    """,
+    "review": """
+    You are a careful, senior code reviewer. Your job is to find real problems, not to rewrite for style.
+
+    Focus on:
+    - Correctness bugs and logic errors
+    - Security and data-handling issues
+    - Missing error handling or edge cases
+    - Unclear or fragile abstractions
+    - Missing tests for non-trivial behavior
+
+    Rules:
+    - Be direct and specific. Point to the exact issue.
+    - Prefer “this is wrong because…” over vague suggestions.
+    - Do not invent problems. If something is fine, say so briefly.
+    - Suggest the smallest fix that addresses the issue.
+    - If you need more context, ask or use tools instead of assuming.
+    """,
+    "debug": """
+    You are a senior engineer debugging a real problem. Your job is to find the root cause, not to guess.
+
+    Process:
+    1. Restate the observed symptom in one sentence.
+    2. Identify what must be inspected before concluding anything.
+    3. Use tools or ask for evidence when repository state is required.
+    4. Form a hypothesis and say what would confirm or refute it.
+    5. Only then propose a fix.
+
+    Rules:
+    - Do not invent stack traces, logs, or file contents.
+    - Prefer evidence over speculation.
+    - Propose the smallest change that addresses the actual cause.
+    - Call out what could still break after the fix.
+    """,
+    "concise": """
+        You are a precise technical assistant. Answer briefly and directly.
+
+    Rules:
+    - Prefer short bullets or short paragraphs.
+    - Lead with the answer, then the necessary detail.
+    - Skip preamble and motivational language.
+    - If the answer is uncertain, say so in one sentence.
+    - When showing code, show only what is needed.
+    """,
+    "architect": """
+        You are a senior engineer focused on design and trade-offs.
+
+    Rules:
+    - Restate the constraints and goals before proposing a design.
+    - Prefer simple designs that can be implemented incrementally.
+    - Explicitly name the trade-offs of the approach you recommend.
+    - Call out what you would measure or revisit later.
+    - Do not invent requirements. If something is missing, ask.
+    - When suggesting code structure, keep it concrete and small.
+    """
+}
 
 def build_system_message(params: GenerationParams) -> dict:
     base = """
@@ -59,6 +135,12 @@ def build_system_message(params: GenerationParams) -> dict:
     - When showing code, show only the relevant parts unless a full file is necessary.
     - When recommending a change, explain why, not just what.
 
+    Plans:
+    - For multi-step work that must survive across sessions, use the create_plan tool.
+    - When a step is finished, call complete_step.
+    - When the whole plan is finished, call complete_plan (this DELETES the plan from disk to free up space).
+    - Do not leave finished plans open. Completion must be explicit via tools.
+
     Tool use:
     - Use GitHub tools when repository context is needed.
     - Do not guess file contents if you can read them.
@@ -71,7 +153,7 @@ def build_system_message(params: GenerationParams) -> dict:
         Reasoning policy:
         - For non-trivial coding problems, first reason inside <thinking>...</thinking>.
         - In the thinking block: inspect the problem, consider constraints, evaluate alternatives, and choose an approach.
-        - After </thinking>, give the final answer only.
+        - After </thinking> at a new line, give the final answer only.
         - Do not put the final answer inside the thinking block.
         """
 
@@ -149,6 +231,7 @@ def stream_reply(
     print(assistant_prompt(model_name), end="", flush=True)
     full: list[str] = []
     interrupted = False
+    start = time.perf_counter()
 
     try:
         for chunk in engine.stream(
@@ -165,11 +248,17 @@ def stream_reply(
     except Exception as exc:
         print_error(f"\nGeneration error: {exc}")
         return "", False
+    
+    elapsed = time.perf_counter() - start
+    text = "".join(full).strip()
+    # rough token estimate
+    tokens = max(1, len(text.split()))
+    tps = tokens / elapsed if elapsed > 0 else 0
 
-    if not interrupted:
-        print()
+    if text and not interrupted:
+        print(f"{C.GRAY}  ({tps:.1f} tokens){C.RESET}")
 
-    return "".join(full).strip(), interrupted
+    return text, interrupted
 
 def generate_with_tools(
     engine,
@@ -279,10 +368,36 @@ def run(
         logger.exception("Model loading failed")
         sys.exit(1)
 
+    print_info("🐣 Running warm-up...")
+    t0 = time.perf_counter()
+    try:
+        warm = engine.generate(
+            [
+                {
+                    "role": "user",
+                    "content": "Hi",
+                },
+            ],
+            max_tokens=16,
+            temperature=0.0,
+            top_p=1.0,
+        )
+
+        dt = time.perf_counter() -t0
+        print_success(f"✓ Warm-up ok ({dt:.1f}s)")
+    except Exception as exc:
+        print_warning(f"Warm-up failed (model may still work): {exc}")
+
+
     print_success("✓ Model loaded successfully")
     print_separator()
     print_help()
     print_separator()
+
+    ensure_history_dirs()
+    pruned = prune_old_sessions()
+    if pruned:
+        print_info(f"Pruned {pruned} sessions file(s) older than a week 🥵")
 
     # ------------------------------------------------------------------
     # Session state
@@ -292,7 +407,17 @@ def run(
 
     params = GenerationParams()
     conv = Conversation(title=model_name or "Chat")
+
     system_message = build_system_message(params)
+
+    resume = build_resume_context()
+    if resume:
+        system_message = {
+            "role": "system",
+            "content": system_message["content"] + "\n\n" + resume,
+        }
+
+        print_info("👻 loaded prior context (summary + active plans).")
 
     print_info("Input queue active — you can type while the model is generating.\n")
 
@@ -333,6 +458,19 @@ def run(
                 github.login()
                 continue
 
+            if cmd.startswith("/preset") or cmd.startswith("preset"):
+                name = user_input.split(maxsplit=1)[-1].strip().lower()
+                if name not in PRESETS:
+                    print_error(f"Unknown preset. Available: {', '.join(PRESETS).keys()}")
+                    continue
+                # override the base system content (keep tools + resume)
+                system_message = {
+                    "role": "system",
+                    "content": PRESETS[name] + "\n\n" + TOOLS_PROMPT,
+                }
+                print_success(f"✓ Preset set to '{name}'")
+                continue
+
             if cmd == "save":
                 path = conv.save()
                 print_success(f"✓ Saved to {path}")
@@ -360,6 +498,37 @@ def run(
                         print(f"  {f.name}")
                 continue
 
+            if cmd in {"/prune", "prune"}:
+                n = prune_old_sessions()
+                print_success(f"✓ Pruned {n} old session file(s)")
+                continue
+
+            if cmd in {"/resume", "resume"}:
+                resume = build_resume_context()
+                if not resume:
+                    print_info("No prior context.")
+                else:
+                    print(resume)
+                continue
+
+            last_user_msg: Optional[str] = None
+            if cmd == "retry":
+                if not last_user_msg:
+                    print_info("Nothing to retry 🤷🏻‍♂️")
+                    continue
+                # remove last assistant message if present so we regenerate cleanly
+                if conv.messages and conv.messages[-1].get("role") == "assistant":
+                    conv.messages.pop()
+                generate_with_tools(
+                    engine=engine,
+                    conv=conv,
+                    system_message=system_message,
+                    params=params,
+                    github=github,
+                    model_name=model_name,
+                )
+                continue
+
             if cmd in {"/queue", "queue"}:
                 items = input_q.snapshot()
                 if not items:
@@ -376,12 +545,72 @@ def run(
                 print_success(f"✓ Cleared {n} queued message(s)")
                 continue
 
+            if cmd in {"/status", "status"}:
+                parts = [
+                    f"model{model_name or 'unknown'}",
+                    f"args={conv.message_count}",
+                    f"{input_q.pending()}",
+                    f"plans={len(list_active_plans())}",
+                ]
+                if github and getattr(github, "username", None):
+                    parts.append(f"github={github.username}")
+                print_info(" · ".join(parts))
+                continue
+
+            if cmd.startswith("/export") or cmd.startswith("export"):
+                name = user_input.split(maxsplit=1)[-1] if " " in user_input else "chat.md"
+                if not name.endswith(".md"):
+                    name += ".md"
+                path = Path.home() / ".qwenchat" / name
+                lines = [f"# {conv.title}\n"]
+                for m in conv.messages:
+                    role = m.get("role", "").upper()
+                    lines.append(f"## {role}\n{m.get('content', '')}\n")
+                path.write_text("\n".join(lines), encoding='utf-8')
+                print_success(f"✓ Exported to {path}")
+                continue
+
+            if cmd in {"/copy", "copy"}:
+                last = next((m["content"] for m in reversed(conv.messages) if m.get("role") == "assistant"), None)
+                if not last:
+                    print_info("No assistant message to copy.")
+                    continue
+                try:
+                    import subprocess
+                    subprocess.run(["pbcopy"], input=last.encode(), check=True)
+                    print_success("✓ Copied last answer to clipboard")
+                except Exception as exc:
+                    print_error(f"Copy failed: {exc}")
+                continue
+
+            if cmd in {"/compact", "compact"}:
+                if conv.messages < 8:
+                    print_info("Conversation is still short - nothing to compact.")
+                    continue
+                # keep th elast 6 messages, summarize the rest into rolling summary
+                keep = conv.messages[-6:]
+                older = conv.messages[:-6]
+                summary_lines = []
+                for m in older:
+                    role = m.get("role", "")
+                    text = (m.get("content") or "")[:200].replace("\n", "")
+                    summary_lines.append(f"{role}: {text}")
+                note = "Compacted older turns:\n" + "\n".join(summary_lines[-20:])
+
+                from .history_store import append_rolling_note
+                append_rolling_note(note)
+                conv.messages = keep
+                print_success(f"✓ Compacted. Kept last {len(keep)} messages.")
+                continue
+
+
             if handle_runtime_command(user_input, params):
                 if cmd.startswith(("/think", "think")):
                     system_message = build_system_message(params)
                 continue
 
             # -------------------- generation --------------------
+            last_user_msg = user_input
             conv.add_user(user_input)
 
             interrupted = generate_with_tools(
