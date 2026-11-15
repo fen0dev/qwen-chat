@@ -2,14 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import sys
-from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Optional
 
-from .config import MAX_TOKENS, TEMPERATURE, TOP_P, GITHUB_TOKEN_FILE
 from .ui import (
     C,
     clear_screen,
@@ -48,16 +45,14 @@ def build_system_message(params: GenerationParams) -> dict:
     - Distinguish clearly between facts you know, assumptions you are making, and recommendations.
 
     How to work on coding tasks:
-    1. First understand the goal and constraints.
-    2. Inspect the relevant code or repository state before proposing changes.
-    3. Identify the root cause or what must be inspected before answering or suggesting fixes.
-    4. Restate the actual engineering problem in one or two sentences.
+    1. Restate the actual engineering problem in one or two sentences.
+    2. Identify what must be inspected before answering.
+    3. Use tools if repository evidence is required.
+    4. Identify the root cause before suggesting fixes.
     5. Propose the smallest change that solves the problem cleanly.
     6. Call out risks, edge cases, and testing implications.
     7. When writing code, make it production-quality: clear names, proper error handling, and no placeholders unless explicitly requested.
-    3. Use tools if repository evidence is required.
-    4. Only then propose a solution.
-    5. If the request is underspecified, ask for the missing constraint instead of inventing one.
+    8. If the request is underspecified, ask for the missing constraint instead of inventing one.
 
     Response style:
     - Be direct and technical.
@@ -75,7 +70,6 @@ def build_system_message(params: GenerationParams) -> dict:
     thinking = ""
     if params.show_thinking:
         thinking = """
-
         Reasoning policy:
         - For non-trivial coding problems, first reason inside <thinking>...</thinking>.
         - In the thinking block: inspect the problem, consider constraints, evaluate alternatives, and choose an approach.
@@ -91,70 +85,56 @@ def build_system_message(params: GenerationParams) -> dict:
 def handle_runtime_command(cmd: str, params: GenerationParams) -> bool:
     """
     Process runtime parameter commands.
-    Returns true if command was handled (so we skip generation)
+    Returns True if the command was handled (so we skip generation).
     """
     parts = cmd.strip().split()
     if not parts:
         return False
-    
+
     command = parts[0].lower()
+
     try:
-        if command in {'/params', 'params'}:
+        if command in {"/params", "params"}:
             print_info(params.summary())
             return True
-        
-        if command in {'/temp', 'temp'} and len(parts) == 2:
+
+        if command in {"/temp", "temp"} and len(parts) == 2:
             params.temperature = float(parts[1])
             print_success(f"Temperature set to {params.temperature}")
             return True
-        
-        if command in {'/token', 'token'} and len(parts) == 2:
+
+        if command in {"/tokens", "tokens", "/token", "token"} and len(parts) == 2:
             params.max_tokens = int(parts[1])
             print_success(f"Max tokens set to {params.max_tokens}")
             return True
-        
-        if command in {'/top_p', 'top_p'} and len(parts) == 2:
+
+        if command in {"/top_p", "top_p"} and len(parts) == 2:
             params.top_p = float(parts[1])
             print_success(f"Top_p set to {params.top_p}")
             return True
-        
-        if command in {'/think', 'think'} and len(parts) == 2:
+
+        if command in {"/think", "think"} and len(parts) == 2:
             value = parts[1].lower()
             if value in {"on", "true", "1"}:
                 params.show_thinking = True
-                print_success(f"{C.BLUE}Thinking enabled{C.BLUE}")
+                print_success("Thinking enabled")
             elif value in {"off", "false", "0"}:
                 params.show_thinking = False
-                print_success(f"{C.GRAY}Thinking disabled{C.GRAY}")
+                print_success("Thinking disabled")
             else:
-                print_error(f"{C.GRAY}Usage: /think  on|off{C.GRAY}")
+                print_error("Usage: /think on|off")
+            return True
 
-        if command in {'/rounds', 'rounds'} and len(parts) == 2:
+        if command in {"/rounds", "rounds"} and len(parts) == 2:
             params.max_tool_rounds = int(parts[1])
             print_success(f"Max tool rounds set to {params.max_tool_rounds}")
             return True
-        
+
     except ValueError:
         print_error("Invalid value")
         return True
-    
+
     return False
-
-def save_conversation(messages: List[Dict[str, str]], name: Optional[str] = None) -> Path:
-    HISTORY_DIR.mkdir(parents=True, exist_ok=True)
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filename = name or f"chat_{timestamp}.json"
-    path = HISTORY_DIR / filename
-    data = {
-        "saved_at": datetime.now().isoformat(),
-        "messages": messages,
-    }
-    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
-    return path
-
-def load_conversation(path: Path) -> List[Dict[str, str]]:
-    data = json.loads(path.read_text(encoding="utf-8"))
-    return data.get("messages", [])
 
 def stream_reply(
     engine,
