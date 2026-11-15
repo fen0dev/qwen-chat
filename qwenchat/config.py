@@ -14,6 +14,7 @@ def _p(key: str, fallback: str = "") -> Path:
     return Path(value)
 
 # name → (backend, path)
+# Set these in your .env.local
 # backend must be "mlx" or "gguf"
 DEEPSEEK_Q4_PATH: Final[Path] = _p("DEEPSEEK_Q4_PATH")
 LFM_Q4_PATH: Final[Path] = _p("LFM_Q4_PATH")
@@ -63,5 +64,9 @@ GITHUB_TIMEOUT: Final[int] = 15
 GITHUB_MAX_REPOS: Final[int] = 30
 GITHUB_MAX_ISSUES: Final[int] = 15
 
+# App
 APP_NAME: Final[str] = "QwenChat"
-APP_VERSION: Final[str] = "0.1.0"
+APP_VERSION: Final[str] = "0.2.0"
+
+#History
+HISTORY_DIR: Final[Path] = Path.home() / ".qwenchat" / "history"
