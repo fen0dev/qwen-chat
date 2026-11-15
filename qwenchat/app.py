@@ -71,7 +71,7 @@ def build_system_message(params: GenerationParams) -> dict:
         Reasoning policy:
         - For non-trivial coding problems, first reason inside <thinking>...</thinking>.
         - In the thinking block: inspect the problem, consider constraints, evaluate alternatives, and choose an approach.
-        - After </thinking>, give the final answer only.
+        - After </thinking> at a new line, give the final answer only.
         - Do not put the final answer inside the thinking block.
         """
 
