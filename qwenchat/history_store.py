@@ -15,7 +15,7 @@ from .config import (
 )
 from .plan import list_active_plans
 
-RESUME_CONTEXT_MAX_CHARS = 8000
+RESUME_CONTEXT_MAX_CHARS = 2500
 
 def ensure_history_dirs() -> None:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)

@@ -14,6 +14,9 @@ from .plan import (
     list_active_plans, 
     load_plan,
 )
+from .local_tools import read_file, list_dir, search_local
+
+MAX_TOOL_CHARS = 8000
 
 @dataclass
 class Tool:
@@ -214,6 +217,30 @@ TOOLS: Dict[str, Tool] = {
         handler=_list_plans,
         needs_github=False,
     ),
+    "read_file": Tool(
+        name="read_file",
+        description="Read a local file (sandboxed to the allowed root directory).",
+        parameters={"path": "Relative path under the allowed root"},
+        handler=lambda args: read_file(args),
+        needs_github=False,
+    ),
+    "list_dir": Tool(
+        name="list_dir",
+        description="List contents of a local directory (sandboxed).",
+        parameters={"path": "Relative directory path (default '.')"},
+        handler=lambda args: list_dir(args),
+        needs_github=False,
+    ),
+    "search_local": Tool(
+        name="search_local",
+        description="Search for a text string in local files under the allowed root.",
+        parameters={
+            "query": "Text to search for",
+            "path": "Directory to search (default '.')",
+        },
+        handler=lambda args: search_local(args),
+        needs_github=False,
+    ),
 }
 
 def build_tools_prompt() -> str:
@@ -298,4 +325,9 @@ def execute_tool(
         else:
             return tool.handler(args)
     except Exception as exc:
-        return f"Unexpected error while executing tool '{tool_name}': {exc}"
+        result = f"Unexpected error while executing tool '{tool_name}': {exc}"
+
+    if len(result) > MAX_TOOL_CHARS:
+        result = result[:MAX_TOOL_CHARS].rstrip() + "\n\n[tool result truncated]"
+
+    return result

@@ -1,0 +1,88 @@
+"""Sandboxed local file tools (read-only)."""
+
+from __future__ import annotations
+
+import os
+import re
+from pathlib import Path
+from typing import Dict, List, Optional
+
+# Default allowed root is the current working directory.
+# Override with QWENCHAT_LOCAL_ROOT in .env.local if needed.
+_LOCAL_ROOT = Path(os.getenv("QWENCHAT_LOCAL_ROOT", ".")).expanduser().resolve()
+MAX_FILE_BYTES = 64_000
+MAX_SEARCH_HITS = 40
+
+def _resolve_safe(path_str: str) -> Optional[Path]:
+    """Resolve path and ensure it stays under the allowed root."""
+    if not path_str:
+        return None
+    try:
+        p = ( _LOCAL_ROOT / path_str ).resolve()
+        p.relative_to(_LOCAL_ROOT)
+        return p
+    except (ValueError, OSError):
+        return None
+
+def read_file(args: Dict[str, str]) -> str:
+    path_str = (args.get("path") or "").strip()
+    p = _resolve_safe(path_str)
+    if p is None or not p.is_file():
+        return "Error: path not found or outside allowed directory."
+    try:
+        data = p.read_bytes()
+        if len(data) > MAX_FILE_BYTES:
+            text = data[:MAX_FILE_BYTES].decode("utf-8", errors="replace")
+            return text + f"\n\n[truncated — file is {len(data)} bytes]"
+        return data.decode("utf-8", errors="replace")
+    except Exception as exc:
+        return f"Error reading file: {exc}"
+
+def list_dir(args: Dict[str, str]) -> str:
+    path_str = (args.get("path") or ".").strip()
+    p = _resolve_safe(path_str)
+    if p is None or not p.is_dir():
+        return "Error: directory not found or outside allowed root."
+    try:
+        entries = []
+        for child in sorted(p.iterdir()):
+            kind = "dir" if child.is_dir() else "file"
+            entries.append(f"{kind:4}  {child.name}")
+        if not entries:
+            return "(empty)"
+        return "\n".join(entries[:200])
+    except Exception as exc:
+        return f"Error listing directory: {exc}"
+
+def search_local(args: Dict[str, str]) -> str:
+    query = (args.get("query") or "").strip()
+    path_str = (args.get("path") or ".").strip()
+    if not query:
+        return "Error: search_local requires a 'query'."
+    root = _resolve_safe(path_str)
+    if root is None or not root.is_dir():
+        return "Error: search root not found or outside allowed directory."
+
+    pattern = re.compile(re.escape(query), re.IGNORECASE)
+    hits: List[str] = []
+    try:
+        for dirpath, _, filenames in os.walk(root):
+            for name in filenames:
+                if name.startswith(".") or name.endswith((".pyc", ".gguf", ".safetensors")):
+                    continue
+                fpath = Path(dirpath) / name
+                try:
+                    text = fpath.read_text(encoding="utf-8", errors="ignore")
+                except Exception:
+                    continue
+                for i, line in enumerate(text.splitlines(), 1):
+                    if pattern.search(line):
+                        rel = fpath.relative_to(_LOCAL_ROOT)
+                        hits.append(f"{rel}:{i}: {line.strip()[:200]}")
+                        if len(hits) >= MAX_SEARCH_HITS:
+                            return "\n".join(hits) + "\n[truncated]"
+        if not hits:
+            return f"No matches for '{query}'."
+        return "\n".join(hits)
+    except Exception as exc:
+        return f"Search error: {exc}"
