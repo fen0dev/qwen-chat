@@ -83,11 +83,26 @@ def print_help() -> None:
     """Print available commands."""
     print(f"""
 {C.YELLOW}Commands:{C.RESET}
-  {C.CYAN}clear{C.RESET}      → Reset conversation memory
-  {C.CYAN}github{C.RESET}     → Connect / reconnect GitHub
-  {C.CYAN}help{C.RESET}       → Show this help
-  {C.CYAN}exit{C.RESET}       → Quit the chat
+  {C.CYAN}clear{C.RESET}        → Reset conversation memory
+  {C.CYAN}save{C.RESET}         → Save current conversation
+  {C.CYAN}load <file>{C.RESET}  → Load a previously saved conversation
+  {C.CYAN}github{C.RESET}       → Connect / reconnect GitHub
+  {C.CYAN}help{C.RESET}         → Show this help
+  {C.CYAN}exit{C.RESET}         → Quit the chat
+
+  {C.CYAN}queue{C.RESET}         → Show queued messages
+    {C.CYAN}/qclear{C.RESET}         → Clear the message queue
 """)
+    
+def print_status(model_name: str | None, github_user: str | None, msg_count: int) -> None:
+    parts = []
+    if model_name:
+        parts.append(f"Model: {model_name}")
+    if github_user:
+        parts.append(f"Github: {github_user}")
+    parts.append(f"Messages: {msg_count}")
+
+    print(f"{C.GRAY}{' · '.join(parts)}{C.RESET}")
 
 
 def print_error(message: str) -> None:

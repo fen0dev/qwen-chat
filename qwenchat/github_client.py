@@ -229,3 +229,56 @@ class GitHubClient:
             lines.append(f"#{number} – {title}")
 
         return "\n".join(lines)
+    
+    def search_code(self, query: str, limit: int = 30) -> str:
+        try:
+            data = self._get(
+                "/search/code",
+                params={"q": query, "per_page": limit},
+            )
+        except GitHubError as exc:
+            return f"Failed to search code: {exc}"
+        
+        items = data.get("items", [])
+        if not items:
+            return f"No results found for query: {query}"
+        
+        lines = [f"Found {data.get('total_count', len(items))} results (showing {len(items)}):\n"]
+        for item in items:
+            repo = item.get("repository", {}).get("full_name", "?")
+            path = item.get("path", "?")
+            lines.append(f"- {repo}/{path}")
+        return "\n".join(lines)
+    
+    def list_pull_requests(
+        self,
+        repo: str,
+        state: str = "open",
+        limit: int = 15,
+    ) -> str:
+        if not repo:
+            return "Error: 'repo' (owner/name) is required."
+        
+        state = state.lower()
+        if state not in {"open", "closed", "all"}:
+            state = "open"
+
+        try:
+            prs: List[Dict[str, Any]] = self._get(
+                f"/repos/{repo}/pulls",
+                params={"state": state, "per_page": limit},
+            )
+        except GitHubError as exc:
+            return f"Failed to list pull requests for {repo}: {exc}"
+        
+        if not prs:
+            return f"No {state} pull requests found in {repo}"
+        
+        lines = [f"{state.title()} pull requests in {repo}:\n"]
+        for pr in prs:
+            number = pr.get("number", "?")
+            title = pr.get("title", "No title")
+            user = pr.get("user", {}).get("login", "?")
+            lines.append(f"#{number} - {title} (by: {user})")
+
+        return "\n".join(lines)
