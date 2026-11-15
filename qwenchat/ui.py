@@ -80,19 +80,25 @@ def print_separator(char: str = "─", width: int = 64) -> None:
 
 
 def print_help() -> None:
-    """Print available commands."""
     print(f"""
-{C.YELLOW}Commands:{C.RESET}
-  {C.CYAN}clear{C.RESET}        → Reset conversation memory
-  {C.CYAN}save{C.RESET}         → Save current conversation
-  {C.CYAN}load <file>{C.RESET}  → Load a previously saved conversation
-  {C.CYAN}github{C.RESET}       → Connect / reconnect GitHub
-  {C.CYAN}help{C.RESET}         → Show this help
-  {C.CYAN}exit{C.RESET}         → Quit the chat
-
-  {C.CYAN}queue{C.RESET}         → Show queued messages
-    {C.CYAN}/qclear{C.RESET}         → Clear the message queue
-""")
+        {C.YELLOW}Commands:{C.RESET}
+        {C.CYAN}clear{C.RESET}          → Reset conversation memory
+        {C.CYAN}save{C.RESET}           → Save current conversation
+        {C.CYAN}load <file>{C.RESET}    → Load a saved conversation
+        {C.CYAN}history{C.RESET}        → List saved conversations
+        {C.CYAN}queue{C.RESET}          → Show queued messages
+        {C.CYAN}/qclear{C.RESET}        → Clear the message queue
+        {C.CYAN}github{C.RESET}         → Connect / reconnect GitHub
+        {C.CYAN}/temp <f>{C.RESET}      → Set temperature
+        {C.CYAN}/tokens <n>{C.RESET}    → Set max tokens
+        {C.CYAN}/top_p <f>{C.RESET}     → Set top_p
+        {C.CYAN}/think on|off{C.RESET}  → Toggle visible reasoning
+        {C.CYAN}/rounds <n>{C.RESET}    → Max tool-call rounds
+        {C.CYAN}/params{C.RESET}        → Show current generation params
+        {C.CYAN}help{C.RESET}           → Show this help
+        {C.CYAN}exit{C.RESET}           → Quit the chat
+        """
+    )
     
 def print_status(model_name: str | None, github_user: str | None, msg_count: int) -> None:
     parts = []
