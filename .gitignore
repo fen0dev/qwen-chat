@@ -13,7 +13,8 @@ env/
 .env.*
 
 # Model weights (large files)
-/models/*
+qwenchat/models/
+models/
 *.gguf
 *.safetensors
 
