@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import gc
 import logging
 import sys
 import time
@@ -23,17 +24,17 @@ from .ui import (
 from .github_client import GitHubClient
 from .tools import TOOLS_PROMPT, parse_tool_call, execute_tool
 from .backends import create_backend
-from .conversation import Conversation
+from .memory.conversation import Conversation
 from .session import GenerationParams
 from .input_queue import InputQueue
 from .config import HISTORY_DIR
-from .history_store import (
+from .memory.history_store import (
     ensure_history_dirs,
     prune_old_sessions,
     build_resume_context,
 )
-from .local_tools import get_local_root, set_local_root, list_available_models
-from .plan import plan_progress_summary
+from  .tools.local_tools import get_local_root, set_local_root, list_available_models
+from .memory.plan import plan_progress_summary
 
 logger = logging.getLogger(__name__)
 
@@ -475,15 +476,12 @@ def run(
                 if not available:
                     print_warning("No models found on disk.")
                     continue
-                print(f"{C.BLUE}Available models:{C.RESET}")
-
+                print(f"{C.YELLOW}Available models:{C.RESET}")
                 for i, (name, backend, path) in enumerate(available, 1):
                     size = path.stat().st_size / (1024 * 1024)
                     size_str = f"{size:.0f}MB" if size < 1024 else f"{size/1024:.1f}GB"
                     current = " ←" if name == model_name else ""
-                    print(f" {C.CYAN}{i}{C.RESET}. {name} {C.GRAY}[{backend}] {size_str} {current}{C.RESET}")
-                    print(f"\n  Type a number to switch, or anything else to cancel.")
-                
+                    print(f"  {C.CYAN}{i}{C.RESET}. {name}  {C.GRAY}[{backend}] {size_str}{current}{C.RESET}")
                 try:
                     choice = input_q.get(block=True).strip()
                 except Exception:
@@ -496,26 +494,15 @@ def run(
                     print_error("Invalid number.")
                     continue
                 new_name, new_backend, new_path = available[idx]
-                print_info(f"⛓ Switching to {new_name}...")
+                print_info(f"Switching to {new_name}...")
                 try:
+                    if hasattr(engine, "unload"):
+                        engine.unload()
+                    del engine
+                    gc.collect()
                     engine = create_backend(new_backend, new_path)
                     model_name = new_name
                     print_success(f"✓ Switched to {new_name}")
-                    # warm-up
-                    try:
-                        engine.generate(
-                            [
-                                {
-                                    "role": "user",
-                                    "content": "Hi!",
-                                },
-                            ],
-                            max_tokens=8,
-                            temperature=0.0,
-                            top_p=1.0,
-                        )
-                    except Exception:
-                        pass
                 except Exception as exc:
                     print_error(f"Failed to switch model: {exc}")
                 continue
@@ -661,7 +648,7 @@ def run(
                     summary_lines.append(f"{role}: {text}")
                 note = "Compacted older turns:\n" + "\n".join(summary_lines[-20:])
 
-                from .history_store import append_rolling_note
+                from .memory.history_store import append_rolling_note
                 append_rolling_note(note)
                 conv.messages = keep
                 print_success(f"✓ Compacted. Kept last {len(keep)} messages.")

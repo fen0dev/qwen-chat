@@ -7,11 +7,9 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .config import MODELS
+from ..config import MODELS
 
-# Default allowed root is the current working directory.
-# Override with QWENCHAT_LOCAL_ROOT in .env.local if needed.
-_LOCAL_ROOT = Path(os.getenv("QWENCHAT_LOCAL_ROOT", ".")).expanduser().resolve()
+_LOCAL_ROOT: Path = Path(os.getenv("QWENCHAT_LOCAL_ROOT", ".")).expanduser().resolve()
 MAX_FILE_BYTES = 64_000
 MAX_SEARCH_HITS = 40
 
@@ -19,24 +17,21 @@ def get_local_root() -> Path:
     return _LOCAL_ROOT
 
 def set_local_root(path: str) -> tuple[bool, str]:
-    """Set the sandbox root. Returns (ok, message)"""
     global _LOCAL_ROOT
     try:
         p = Path(path).expanduser().resolve()
-        if not p in p.is_dir():
+        if not p.is_dir():
             return False, f"Not a directory: {p}"
         _LOCAL_ROOT = p
-        return True, f"Local root set to: {p}"
+        return True, f"Local root set to {p}"
     except Exception as exc:
-        return False, f"Invalid path: {p}"
-
+        return False, f"Invalid path: {exc}"
 
 def _resolve_safe(path_str: str) -> Optional[Path]:
-    """Resolve path and ensure it stays under the allowed root."""
     if not path_str:
         return None
     try:
-        p = ( _LOCAL_ROOT / path_str ).resolve()
+        p = (_LOCAL_ROOT / path_str).resolve()
         p.relative_to(_LOCAL_ROOT)
         return p
     except (ValueError, OSError):
@@ -66,9 +61,7 @@ def list_dir(args: Dict[str, str]) -> str:
         for child in sorted(p.iterdir()):
             kind = "dir" if child.is_dir() else "file"
             entries.append(f"{kind:4}  {child.name}")
-        if not entries:
-            return "(empty)"
-        return "\n".join(entries[:200])
+        return "\n".join(entries[:200]) if entries else "(empty)"
     except Exception as exc:
         return f"Error listing directory: {exc}"
 
@@ -80,7 +73,6 @@ def search_local(args: Dict[str, str]) -> str:
     root = _resolve_safe(path_str)
     if root is None or not root.is_dir():
         return "Error: search root not found or outside allowed directory."
-
     pattern = re.compile(re.escape(query), re.IGNORECASE)
     hits: List[str] = []
     try:
@@ -99,19 +91,17 @@ def search_local(args: Dict[str, str]) -> str:
                         hits.append(f"{rel}:{i}: {line.strip()[:200]}")
                         if len(hits) >= MAX_SEARCH_HITS:
                             return "\n".join(hits) + "\n[truncated]"
-        if not hits:
-            return f"No matches for '{query}'."
-        return "\n".join(hits)
+        return "\n".join(hits) if hits else f"No matches for '{query}'."
     except Exception as exc:
         return f"Search error: {exc}"
-    
+
 def list_available_models() -> list[tuple[str, str, Path]]:
     available = []
     for name, value in MODELS.items():
         if isinstance(value, (tuple, list)) and len(value) == 2:
             backend, path = value
         else:
-            backend, value = "mlx", value
+            backend, path = "mlx", value
         path = Path(path).expanduser()
         if path.exists() and path.stat().st_size > 0:
             available.append((name, backend, path))

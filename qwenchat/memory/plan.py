@@ -10,7 +10,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
-from .config import PLANS_DIR
+from ..config import PLANS_DIR
 
 @dataclass
 class Step:
