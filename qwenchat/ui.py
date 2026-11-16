@@ -46,14 +46,23 @@ def clear_screen() -> None:
 
 def print_banner(model_name: str | None = None) -> None:
     if not supports_color():
-        print(f"Qwenchat  ·  {model_name or 'Select a model'}")
+        print(f"QwenChat  ·  {model_name or 'Select a model'}")
         return
 
-    print()
-    print(f"  {C.ACCENT}{C.BOLD}Qwenchat{C.RESET}")
+    banner = f"""
+        {C.ACCENT}{C.BOLD}
+            ██████╗  ██╗    ██╗███████╗███╗   ██╗
+            ██╔═══██╗██║    ██║██╔════╝████╗  ██║
+            ██║   ██║██║ █╗ ██║█████╗  ██╔██╗ ██║
+            ██║▄▄ ██║██║███╗██║██╔══╝  ██║╚██╗██║
+            ╚██████╔╝╚███╔███╔╝███████╗██║ ╚████║
+            ╚══▀▀═╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═══╝
+        {C.RESET}
+    """
+    print(banner)
     print(f"  {C.MUTED}Local coding assistant · Open-weight LLM{C.RESET}")
     if model_name:
-        short = model_name if len(model_name) <= 48 else model_name[:45] + "…"
+        short = model_name if len(model_name) <= 52 else model_name[:49] + "…"
         print(f"  {C.TEXT}{short}{C.RESET}")
     print()
 
