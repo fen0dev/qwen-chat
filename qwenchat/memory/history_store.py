@@ -10,7 +10,7 @@ from typing import List, Optional
 from ..config import (
     SESSION_DIR,
     SUMMARY_PATH,
-    SESSION_TTLS_DAYS,
+    SESSION_TTL_DAYS,
     ROLLING_SUMMARY_MAX_CHARS,
 )
 from ..memory.plan import list_active_plans
@@ -21,7 +21,7 @@ def ensure_history_dirs() -> None:
     SESSION_DIR.mkdir(parents=True, exist_ok=True)
     SUMMARY_PATH.parent.mkdir(parents=True, exist_ok=True)
 
-def prune_old_sessions(ttl_days: int = SESSION_TTLS_DAYS) -> int:
+def prune_old_sessions(ttl_days: int = SESSION_TTL_DAYS) -> int:
     """Delete session files older than set ttl_days. Returns count deleted"""
 
     ensure_history_dirs()
@@ -66,7 +66,7 @@ def append_rolling_note(note: str) -> None:
         return
     current = load_rolling_summary()
     merged = f"{current}\n- {note}.".strip() if current else f"- {note}"
-    save_rolling_summary()
+    save_rolling_summary(merged)
 
 def build_resume_context() -> str:
     """
