@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "qwenchat"
-version = "0.1.0"
+version = "0.2.0"
 description = "Beautiful terminal chat for Qwen3.8-27B-Uncensored-MLX with GitHub integration"
 readme = "README.md"
 requires-python = ">=3.10"
