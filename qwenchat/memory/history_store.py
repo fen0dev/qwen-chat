@@ -7,13 +7,13 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import List, Optional
 
-from .config import (
+from ..config import (
     SESSION_DIR,
     SUMMARY_PATH,
     SESSION_TTLS_DAYS,
     ROLLING_SUMMARY_MAX_CHARS,
 )
-from .plan import list_active_plans
+from ..memory.plan import list_active_plans
 
 RESUME_CONTEXT_MAX_CHARS = 2500
 
