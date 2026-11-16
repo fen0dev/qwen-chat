@@ -7,11 +7,29 @@ import re
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from .config import MODELS
+
 # Default allowed root is the current working directory.
 # Override with QWENCHAT_LOCAL_ROOT in .env.local if needed.
 _LOCAL_ROOT = Path(os.getenv("QWENCHAT_LOCAL_ROOT", ".")).expanduser().resolve()
 MAX_FILE_BYTES = 64_000
 MAX_SEARCH_HITS = 40
+
+def get_local_root() -> Path:
+    return _LOCAL_ROOT
+
+def set_local_root(path: str) -> tuple[bool, str]:
+    """Set the sandbox root. Returns (ok, message)"""
+    global _LOCAL_ROOT
+    try:
+        p = Path(path).expanduser().resolve()
+        if not p in p.is_dir():
+            return False, f"Not a directory: {p}"
+        _LOCAL_ROOT = p
+        return True, f"Local root set to: {p}"
+    except Exception as exc:
+        return False, f"Invalid path: {p}"
+
 
 def _resolve_safe(path_str: str) -> Optional[Path]:
     """Resolve path and ensure it stays under the allowed root."""
@@ -86,3 +104,15 @@ def search_local(args: Dict[str, str]) -> str:
         return "\n".join(hits)
     except Exception as exc:
         return f"Search error: {exc}"
+    
+def list_available_models() -> list[tuple[str, str, Path]]:
+    available = []
+    for name, value in MODELS.items():
+        if isinstance(value, (tuple, list)) and len(value) == 2:
+            backend, path = value
+        else:
+            backend, value = "mlx", value
+        path = Path(path).expanduser()
+        if path.exists() and path.stat().st_size > 0:
+            available.append((name, backend, path))
+    return available

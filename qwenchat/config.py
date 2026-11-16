@@ -4,6 +4,8 @@ from pathlib import Path
 from typing import Dict, Final, Tuple
 import os
 
+from .ui import C
+
 from dotenv import load_dotenv
 
 ENV_FILE = Path(__file__).resolve().parent / ".env.local"
@@ -28,7 +30,7 @@ MODELS: Final[Dict[str, Tuple[str, Path]]] = {
         "mlx",
         QWEN_4BIT_PATH,
     ),
-    "Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M)": (
+    """Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M) · {C.ITALIC}{C.BLUE}Not downloaded{C.RESET}""": (
         "gguf",
         QWEN_FABLE,
     ),

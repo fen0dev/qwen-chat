@@ -1,4 +1,4 @@
-"""Main application logic – chat loop with memory, streaming and GitHub tools."""
+"""Main application logic - chat loop with memory, streaming and GitHub tools."""
 
 from __future__ import annotations
 
@@ -18,12 +18,11 @@ from .ui import (
     print_success,
     print_info,
     print_warning,
-    user_prompt,
     assistant_prompt,
 )
 from .github_client import GitHubClient
 from .tools import TOOLS_PROMPT, parse_tool_call, execute_tool
-from .backends import create_backend, BaseBackend
+from .backends import create_backend
 from .conversation import Conversation
 from .session import GenerationParams
 from .input_queue import InputQueue
@@ -32,8 +31,9 @@ from .history_store import (
     ensure_history_dirs,
     prune_old_sessions,
     build_resume_context,
-    list_active_plans,
 )
+from .local_tools import get_local_root, set_local_root, list_available_models
+from .plan import plan_progress_summary
 
 logger = logging.getLogger(__name__)
 
@@ -458,6 +458,69 @@ def run(
                 github.login()
                 continue
 
+            if cmd.startswith("/root") or cmd.startswith("root"):
+                parts = user_input.split(maxsplit=1)
+                if len(parts) == 1:
+                    print_info(f"Current local root: {get_local_root()}")
+                    continue
+                ok, msg = set_local_root(parts[1])
+                if ok:
+                    print_success(f"✓ {msg}")
+                else:
+                    print_error(msg)
+                continue
+
+            if cmd in {"/models", "models"}:
+                available = list_available_models()
+                if not available:
+                    print_warning("No models found on disk.")
+                    continue
+                print(f"{C.BLUE}Available models:{C.RESET}")
+
+                for i, (name, backend, path) in enumerate(available, 1):
+                    size = path.stat().st_size / (1024 * 1024)
+                    size_str = f"{size:.0f}MB" if size < 1024 else f"{size/1024:.1f}GB"
+                    current = " ←" if name == model_name else ""
+                    print(f" {C.CYAN}{i}{C.RESET}. {name} {C.GRAY}[{backend}] {size_str} {current}{C.RESET}")
+                    print(f"\n  Type a number to switch, or anything else to cancel.")
+                
+                try:
+                    choice = input_q.get(block=True).strip()
+                except Exception:
+                    continue
+                if not choice.isdigit():
+                    print_info("Cancelled.")
+                    continue
+                idx = int(choice) - 1
+                if not (0 <= idx < len(available)):
+                    print_error("Invalid number.")
+                    continue
+                new_name, new_backend, new_path = available[idx]
+                print_info(f"⛓ Switching to {new_name}...")
+                try:
+                    engine = create_backend(new_backend, new_path)
+                    model_name = new_name
+                    print_success(f"✓ Switched to {new_name}")
+                    # warm-up
+                    try:
+                        engine.generate(
+                            [
+                                {
+                                    "role": "user",
+                                    "content": "Hi!",
+                                },
+                            ],
+                            max_tokens=8,
+                            temperature=0.0,
+                            top_p=1.0,
+                        )
+                    except Exception:
+                        pass
+                except Exception as exc:
+                    print_error(f"Failed to switch model: {exc}")
+                continue
+
+
             if cmd.startswith("/preset") or cmd.startswith("preset"):
                 name = user_input.split(maxsplit=1)[-1].strip().lower()
                 if name not in PRESETS:
@@ -549,8 +612,9 @@ def run(
                 parts = [
                     f"model{model_name or 'unknown'}",
                     f"args={conv.message_count}",
-                    f"{input_q.pending()}",
-                    f"plans={len(list_active_plans())}",
+                    f"queue={input_q.pending()}",
+                    plan_progress_summary(),
+                    f"root={get_local_root().name}",
                 ]
                 if github and getattr(github, "username", None):
                     parts.append(f"github={github.username}")
