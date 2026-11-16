@@ -1,4 +1,4 @@
-"""Terminal UI helpers – colors, banners and messaging."""
+"""Clean terminal UI — refined palette, clear hierarchy."""
 
 from __future__ import annotations
 
@@ -6,145 +6,141 @@ import os
 import sys
 from typing import Optional
 
-
 class Colors:
-    """ANSI escape codes."""
-    RESET: str = "\033[0m"
-    BOLD: str = "\033[1m"
-    DIM: str = "\033[2m"
-    ITALIC: str = "\033[3m"
+    RESET = "\033[0m"
+    BOLD = "\033[1m"
+    DIM = "\033[2m"
+    ITALIC = "\033[3m"
 
-    CYAN: str = "\033[96m"
-    GREEN: str = "\033[92m"
-    YELLOW: str = "\033[93m"
-    MAGENTA: str = "\033[95m"
-    RED: str = "\033[91m"
-    WHITE: str = "\033[97m"
-    GRAY: str = "\033[90m"
-    BLUE: str = "\033[94m"
+    # Refined palette
+    ACCENT = "\033[38;5;111m"      # soft blue
+    ACCENT_DIM = "\033[38;5;67m"
+    SUCCESS = "\033[38;5;114m"     # soft green
+    WARNING = "\033[38;5;179m"     # warm gold
+    ERROR = "\033[38;5;167m"       # soft red
+    MUTED = "\033[38;5;245m"       # mid gray
+    TEXT = "\033[38;5;252m"        # near-white
+    BORDER = "\033[38;5;238m"
 
+    # Keep old names for compatibility
+    CYAN = ACCENT
+    GREEN = SUCCESS
+    YELLOW = WARNING
+    MAGENTA = "\033[38;5;176m"
+    RED = ERROR
+    WHITE = TEXT
+    GRAY = MUTED
+    BLUE = ACCENT
 
-# Short alias used throughout the project
 C = Colors
 
-
 def supports_color() -> bool:
-    """Return True if the current terminal likely supports ANSI colors."""
     if os.getenv("NO_COLOR"):
         return False
-    if not hasattr(sys.stdout, "isatty"):
-        return False
-    return bool(sys.stdout.isatty())
-
+    return bool(getattr(sys.stdout, "isatty", lambda: False)())
 
 def clear_screen() -> None:
-    """Clear the terminal screen in a cross-platform way."""
-    command = "cls" if os.name == "nt" else "clear"
     try:
-        os.system(command)
+        os.system("cls" if os.name == "nt" else "clear")
     except Exception:
         print("\n" * 40)
 
-
 def print_banner(model_name: str | None = None) -> None:
-    """Print the application ASCII banner. optionally, show the selected model name."""
     if not supports_color():
-        title = model_name or "QwenChat"
-        print(f"QwenChat - {title}")
+        print(f"QwenChat  ·  {model_name or 'Select a model'}")
         return
 
-    banner = f"""
-{C.CYAN}{C.BOLD}
-     ██████╗ ██╗    ██╗███████╗███╗   ██╗
-    ██╔═══██╗██║    ██║██╔════╝████╗  ██║
-    ██║   ██║██║ █╗ ██║█████╗  ██╔██╗ ██║
-    ██║▄▄ ██║██║███╗██║██╔══╝  ██║╚██╗██║
-    ╚██████╔╝╚███╔███╔╝███████╗██║ ╚████║
-     ╚══▀▀═╝  ╚══╝╚══╝ ╚══════╝╚═╝  ╚═══╝
-{C.RESET}"""
-    print(banner)
-
+    print()
+    print(f"  {C.ACCENT}{C.BOLD}QwenChat{C.RESET}")
+    print(f"  {C.MUTED}Local coding assistant · Apple Silicon{C.RESET}")
     if model_name:
-        print(f"{C.MAGENTA}{C.BOLD}          {model_name}{C.RESET}")
-    else:
-        print(f"{C.MAGENTA}{C.BOLD}          Select a model{C.RESET}")
-
-    print(f"{C.GRAY}        Apple Silicon · MLX / GGUF · GitHub Enabled{C.RESET}")
-
+        short = model_name if len(model_name) <= 48 else model_name[:45] + "…"
+        print(f"  {C.TEXT}{short}{C.RESET}")
+    print()
 
 def print_separator(char: str = "─", width: int = 64) -> None:
-    """Print a horizontal separator line."""
-    color = C.GRAY if supports_color() else ""
-    reset = C.RESET if supports_color() else ""
-    print(f"{color}{char * width}{reset}")
+    if supports_color():
+        print(f"{C.BORDER}{char * width}{C.RESET}")
+    else:
+        print(char * width)
 
-
-def print_help() -> None:
-    print(f"""
-        {C.YELLOW}Commands:{C.RESET}
-        {C.CYAN}clear{C.RESET}          → Reset conversation memory
-        {C.CYAN}save{C.RESET}           → Save current conversation
-        {C.CYAN}/root [path]{C.RESET}   → Show or set local file sandbox root
-        {C.CYAN}/models{C.RESET}        → List models and switch by number
-        {C.CYAN}load <file>{C.RESET}    → Load a saved conversation
-        {C.CYAN}history{C.RESET}        → List saved conversations
-        {C.CYAN}queue{C.RESET}          → Show queued messages
-        {C.CYAN}/qclear{C.RESET}        → Clear the message queue
-        {C.CYAN}/prune{C.RESET}         → Delete session files older than 7 days
-        {C.CYAN}/resume{C.RESET}        → Show prior context (summary + active plans)
-        {C.CYAN}github{C.RESET}         → Connect / reconnect GitHub
-        {C.CYAN}/think on|off{C.RESET}  → Toggle visible reasoning
-        {C.CYAN}exit{C.RESET}           → Quit the chat
-
-        {C.YELLOW}Plan mode (model can use and call tools):{C.RESET}
-        create_plan, complete_step, complete_plan, list_plans
-
-        {C.ITALIC}You can also edit and set temperature, top_p, tokens, 
-        max tool rounds, or check parameters generation by typing:{C.RESET}
-            /temp 0.7
-            /tokens 1024
-            /top_p 0.9
-            /rounds 5
-            /params
-        """
-    )
-    
-def print_status(model_name: str | None, github_user: str | None, msg_count: int) -> None:
+def print_status_bar(
+    model_name: str | None = None,
+    github_user: str | None = None,
+    msg_count: int = 0,
+    queue: int = 0,
+    plans: str = "",
+) -> None:
     parts = []
     if model_name:
-        parts.append(f"Model: {model_name}")
+        short = model_name.split("(")[0].strip()
+        if len(short) > 28:
+            short = short[:25] + "…"
+        parts.append(f"{C.ACCENT}{short}{C.RESET}")
     if github_user:
-        parts.append(f"Github: {github_user}")
-    parts.append(f"Messages: {msg_count}")
+        parts.append(f"{C.MUTED}gh:{github_user}{C.RESET}")
+    parts.append(f"{C.MUTED}msgs:{msg_count}{C.RESET}")
+    if queue:
+        parts.append(f"{C.WARNING}q:{queue}{C.RESET}")
+    if plans and plans != "plans=0":
+        parts.append(f"{C.MUTED}{plans}{C.RESET}")
+    print(f"  {'  '.join(parts)}")
 
-    print(f"{C.GRAY}{' · '.join(parts)}{C.RESET}")
-
+def print_help() -> None:
+    print()
+    print(f"  {C.BOLD}Commands{C.RESET}")
+    print(f"  {C.MUTED}{'─' * 52}{C.RESET}")
+    rows = [
+        ("/models", "List models and switch by number"),
+        ("/root [path]", "Show or set local sandbox root"),
+        ("/preset <name>", "coding · review · debug · concise · architect"),
+        ("/status", "Session status"),
+        ("/compact", "Compact older turns into memory"),
+        ("/export [name]", "Export conversation to Markdown"),
+        ("/copy", "Copy last answer"),
+        ("retry", "Regenerate last answer"),
+        ("save / load / history", "Conversation persistence"),
+        ("/prune", "Delete sessions older than 7 days"),
+        ("/resume", "Show prior context"),
+        ("/params", "Show generation settings"),
+        ("clear / help / exit", "Standard controls"),
+    ]
+    for cmd, desc in rows:
+        print(f"  {C.ACCENT}{cmd:<22}{C.RESET} {C.MUTED}{desc}{C.RESET}")
+    print()
+    print(f"  {C.MUTED}Generation: /temp  /tokens  /top_p  /think  /rounds{C.RESET}")
+    print()
 
 def print_error(message: str) -> None:
-    print(f"{C.RED}{message}{C.RESET}")
-
+    print(f"  {C.ERROR}✗ {message}{C.RESET}")
 
 def print_success(message: str) -> None:
-    print(f"{C.GREEN}{message}{C.RESET}")
-
+    print(f"  {C.SUCCESS}✓ {message}{C.RESET}")
 
 def print_info(message: str) -> None:
-    print(f"{C.DIM}{message}{C.RESET}")
-
+    print(f"  {C.MUTED}{message}{C.RESET}")
 
 def print_warning(message: str) -> None:
-    print(f"{C.YELLOW}{message}{C.RESET}")
-
+    print(f"  {C.WARNING}! {message}{C.RESET}")
 
 def user_prompt() -> str:
-    return f"{C.GREEN}{C.BOLD}You ✦ {C.RESET}"
-
+    return f"\n  {C.SUCCESS}{C.BOLD}You{C.RESET}  "
 
 def assistant_prompt(model_name: str | None = None) -> str:
     label = "Qwen"
     if model_name:
-        label = model_name
-        if len(label) > 12:
-            label = label[:9]
-            
-    return f"{C.CYAN}{C.BOLD}{label} ✦ {C.RESET}"
+        label = model_name.split("(")[0].strip()
+        if len(label) > 16:
+            label = label[:14] + "…"
+    return f"\n  {C.ACCENT}{C.BOLD}{label}{C.RESET}  "
+
+def print_tool_call(round_idx: int, tool_name: str) -> None:
+    print(f"\n  {C.ACCENT_DIM}⚙ [{round_idx}] {tool_name}{C.RESET}")
+
+def print_tool_result(text: str, max_lines: int = 12) -> None:
+    lines = text.strip().splitlines()
+    shown = lines[:max_lines]
+    for line in shown:
+        print(f"  {C.MUTED}│ {line}{C.RESET}")
+    if len(lines) > max_lines:
+        print(f"  {C.MUTED}│ … ({len(lines) - max_lines} more lines){C.RESET}")

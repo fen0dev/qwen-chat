@@ -20,6 +20,9 @@ from .ui import (
     print_info,
     print_warning,
     assistant_prompt,
+    user_prompt,
+    print_tool_call,
+    print_status_bar,
 )
 from .github_client import GitHubClient
 from .tools import TOOLS_PROMPT, parse_tool_call, execute_tool
@@ -241,7 +244,7 @@ def stream_reply(
             temperature=temperature,
             top_p=top_p,
         ):
-            print(f"{C.WHITE}{chunk}{C.RESET}", end="", flush=True)
+            print(f"{C.TEXT}{chunk}{C.RESET}", end="", flush=True)
             full.append(chunk)
     except KeyboardInterrupt:
         interrupted = True
@@ -303,7 +306,7 @@ def generate_with_tools(
 
             # Tool call path
             tool_name, args = tool_call
-            print(f"\n{C.BLUE}⚙ [{round_idx+1}] Calling tool: {tool_name}{C.RESET}")
+            print_tool_call(round_idx + 1, tool_name)
 
             tool_result = execute_tool(github, tool_name, args)
 
@@ -429,6 +432,7 @@ def run(
                 print(f"{C.GRAY}({pending} queued){C.RESET}")
 
             try:
+                print(user_prompt(), end="", flush=True)
                 user_input = input_q.get(block=True)
             except (KeyboardInterrupt, EOFError):
                 print(f"\n\n{C.MAGENTA}Session ended. Goodbye.{C.RESET}\n")
@@ -596,16 +600,13 @@ def run(
                 continue
 
             if cmd in {"/status", "status"}:
-                parts = [
-                    f"model{model_name or 'unknown'}",
-                    f"args={conv.message_count}",
-                    f"queue={input_q.pending()}",
-                    plan_progress_summary(),
-                    f"root={get_local_root().name}",
-                ]
-                if github and getattr(github, "username", None):
-                    parts.append(f"github={github.username}")
-                print_info(" · ".join(parts))
+                print_status_bar(
+                    model_name=model_name,
+                    github_user=getattr(github, "username", None) if github else None,
+                    masg_count=conv.message_count,
+                    queue=input_q.pending(),
+                    plans=plan_progress_summary(),
+                )
                 continue
 
             if cmd.startswith("/export") or cmd.startswith("export"):
