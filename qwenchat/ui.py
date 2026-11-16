@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import os
 import sys
-from typing import Optional
 
 class Colors:
     RESET = "\033[0m"
@@ -47,12 +46,12 @@ def clear_screen() -> None:
 
 def print_banner(model_name: str | None = None) -> None:
     if not supports_color():
-        print(f"QwenChat  ·  {model_name or 'Select a model'}")
+        print(f"Qwenchat  ·  {model_name or 'Select a model'}")
         return
 
     print()
-    print(f"  {C.ACCENT}{C.BOLD}QwenChat{C.RESET}")
-    print(f"  {C.MUTED}Local coding assistant · Apple Silicon{C.RESET}")
+    print(f"  {C.ACCENT}{C.BOLD}Qwenchat{C.RESET}")
+    print(f"  {C.MUTED}Local coding assistant · Open-weight LLM{C.RESET}")
     if model_name:
         short = model_name if len(model_name) <= 48 else model_name[:45] + "…"
         print(f"  {C.TEXT}{short}{C.RESET}")

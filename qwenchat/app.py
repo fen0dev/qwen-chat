@@ -345,7 +345,7 @@ def run(
     github: Optional[GitHubClient] = GitHubClient()
 
     if github.load_token():
-        print_success(f"✓ GitHub connected as {C.BOLD}{github.username}{C.RESET}")
+        print_success(f"GitHub connected as {C.BOLD}{github.username}{C.RESET}")
     else:
         print_warning("GitHub is not connected yet.")
         try:
