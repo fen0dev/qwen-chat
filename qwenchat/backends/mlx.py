@@ -55,7 +55,6 @@ class MLXBackend(BaseBackend):
         top_p: float,
     ) -> Generator[str, None, None]:
         prompt = self._build_prompt(messages)
-
         for chunk in self._stream_generate(
             self.model,
             self.processor,
@@ -64,17 +63,18 @@ class MLXBackend(BaseBackend):
             temperature=temperature,
             top_p=top_p,
         ):
-            text = self._extract_text(chunk)
+            text = self._extract_text(chunk, strip=False)
             if text:
                 yield text
 
     @staticmethod
-    def _extract_text(result: Any):
+    def _extract_text(result: Any, strip: bool = True) -> str:
         if result is None:
             return ""
         if hasattr(result, "text"):
-            return str(getattr(result, "text") or "").strip()
-        if isinstance(result, (list, tuple)) and result:
-            return str(result[0]).strip()
-        
-        return str(result).strip()
+            text = str(getattr(result, "text") or "")
+        elif isinstance(result, (list, tuple)) and result:
+            text = str(result[0])
+        else:
+            text = str(result)
+        return text.strip() if strip else text
