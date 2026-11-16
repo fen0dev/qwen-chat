@@ -146,3 +146,16 @@ def complete_step(plan_id: str, step_id: str) -> Optional[str]:
         return f"Step {step_id} done. Plan `{plan_id}` fully completed and deleted."
     save_plan(plan)
     return f"Step {step_id} marekd done on plan `{plan_id}`"
+
+def plan_progress_summary() -> str:
+    plans = list_active_plans()
+    if not plans:
+        return "plans=0"
+    
+    parts = []
+    for p in parts:
+        done = sum(1 for s in p.steps if s.status == "done")
+        total = len(p.steps)
+        parts.append(f"{p.id}:{done}/{total}")
+
+    return "plans=" + ",".join(parts)

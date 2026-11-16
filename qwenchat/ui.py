@@ -84,6 +84,8 @@ def print_help() -> None:
         {C.YELLOW}Commands:{C.RESET}
         {C.CYAN}clear{C.RESET}          → Reset conversation memory
         {C.CYAN}save{C.RESET}           → Save current conversation
+        {C.CYAN}/root [path]{C.RESET}   → Show or set local file sandbox root
+        {C.CYAN}/models{C.RESET}        → List models and switch by number
         {C.CYAN}load <file>{C.RESET}    → Load a saved conversation
         {C.CYAN}history{C.RESET}        → List saved conversations
         {C.CYAN}queue{C.RESET}          → Show queued messages
@@ -92,18 +94,18 @@ def print_help() -> None:
         {C.CYAN}/resume{C.RESET}        → Show prior context (summary + active plans)
         {C.CYAN}github{C.RESET}         → Connect / reconnect GitHub
         {C.CYAN}/think on|off{C.RESET}  → Toggle visible reasoning
-        {C.CYAN}/params{C.RESET}        → Show current generation params
         {C.CYAN}exit{C.RESET}           → Quit the chat
 
         {C.YELLOW}Plan mode (model can use and call tools):{C.RESET}
         create_plan, complete_step, complete_plan, list_plans
 
-        {C.ITALIC}You can also edit temperature, top_p, tokens, 
-        max tool rounds by typing:{C.RESET}
+        {C.ITALIC}You can also edit and set temperature, top_p, tokens, 
+        max tool rounds, or check parameters generation by typing:{C.RESET}
             /temp 0.7
             /tokens 1024
             /top_p 0.9
             /rounds 5
+            /params
         """
     )
     
