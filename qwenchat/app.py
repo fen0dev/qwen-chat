@@ -511,7 +511,7 @@ def run(
             if cmd.startswith("/preset") or cmd.startswith("preset"):
                 name = user_input.split(maxsplit=1)[-1].strip().lower()
                 if name not in PRESETS:
-                    print_error(f"Unknown preset. Available: {', '.join(PRESETS).keys()}")
+                    print_error(f"Unknown preset. Available: {', '.join(PRESETS.keys())}")
                     continue
                 # override the base system content (keep tools + resume)
                 system_message = {

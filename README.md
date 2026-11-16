@@ -1,21 +1,32 @@
+<div align="center">
+
 # QwenChat
 
-**Terminal chat for Qwen3.8 and any other open-weight models with conversation memory and GitHub integration.**
+**A fast, local terminal chat client for Apple Silicon**  
+*Streaming · Multi-step tools · GitHub · Plans · Memory*
 
-![Python](https://img.shields.io/badge/Python-3.10+-blue)
-![License](https://img.shields.io/badge/License-MIT-green)
-![Platform](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-lightgrey)
+![Python](https://img.shields.io/badge/Python-3.10+-blue?style=for-the-badge)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+![Platform](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-lightgrey?style=for-the-badge)
+![Backends](https://img.shields.io/badge/Backends-MLX%20%7C%20GGUF-orange?style=for-the-badge)
+
+</div>
 
 ---
 
 ## Features
 
-- Clean and colorful terminal interface
-- Full conversation memory
-- GitHub integration (list repos, read files, list issues)
-- Easy authentication with Personal Access Token
-- Built specifically for `orcarouter/Qwen3.8-27B-Uncensored-MLX`
-- Simple to install and run
+| | |
+|---|---|
+| ⚡ | Streaming replies with token/s |
+| 🧠 | Multi-step tool calling (GitHub + local + plans) |
+| 📁 | Sandboxed local file tools |
+| 🐙 | GitHub integration (repos, files, issues, PRs, search) |
+| 📋 | Persistent plans that survive sessions |
+| 💾 | Conversation history + rolling summary |
+| 🎛️ | Runtime parameters (`/temp`, `/tokens`, `/preset`, …) |
+| 🔄 | Numbered model switching mid-session |
+| ⌨️ | Input queue (type while the model generates) |
 
 ---
 
@@ -43,6 +54,28 @@ source .venv/bin/activate
 pip install -r requirements.txt
 ```
 
+---
+
+## Usage
+
+Copy ```.env.local``` and set your model paths:
+
+```bash
+# Example:
+QWEN_4BIT_PATH=/path/to/mlx-model
+LFM_Q4_PATH=/path/to/model.Q4_K_M.gguf
+```
+
+Run:
+
+```bash
+python3 -m qwenchat
+# or
+pip install -e .
+qwenchat
+```
+---
+
 ### Download the model
 
 Download the model from: https://huggingface.co/orcarouter/Qwen3.8-27B-Uncensored-MLX with the following command:
@@ -55,29 +88,43 @@ hf download orcarouter/Qwen3.8-27B-Uncensored-MLX \
 
 ---
 
-## Usage
-
-Before running the next commands, make sure that the models are installed and then open “.env.local“ and edit the path to your model if located elsewhere.
-
-```bash
-python -m qwenchat
-```
-
-Or after installing the package:
-
-```bash
-pip install -e .
-qwenchat
-```
-
 ### Available commands inside the chat
 
-| Command   | Description                     |
-|-----------|---------------------------------|
-| `clear`   | Reset conversation memory       |
-| `github`  | Connect / reconnect GitHub      |
-| `help`    | Show help                       |
-| `exit`    | Quit the application            |
+| Command | Description |
+| --- | --- |
+| /models | List models and switch by number |
+| /root [path] | Show or set local file sandbox root |
+| /preset coding\|review\|debug\|concise\|architect | Switch system style |
+| /status | Session status |
+| /compact | Summarize older turns into rolling memory |
+| /export [name] | Export conversation to Markdown |
+| /copy | Copy last answer to clipboard |
+| retry | Regenerate the last answer |
+| save / load <file> / history | Conversation persistence |
+| /prune | Delete sessions older than 7 days |
+| /resume | Show prior context |
+| /temp /tokens /top_p /think /rounds /params | Runtime generation settings |
+| clear / help / exit | Standard controls |
+
+---
+
+## Project Structure
+
+```
+qwenchat/
+  ├── app.py
+  ├── config.py
+  ├── ui.py
+  ├── __init__.py
+  ├── __main__.py
+  ├── session.py
+  ├── github_client.py
+  ├── input_queue.py
+  ├── backends/          # base + MLX + GGUF
+  ├── tools/             # registry, local, plans
+  ├── memory/            # conversation, history, plans
+  └── models/            # empty folder where you should place open-weight model(s)
+```
 
 ---
 
@@ -116,26 +163,14 @@ TOP_P = 0.9
 
 ---
 
-## Project Structure
+## Environment variables (optional)
 
-```
-QwenChat/
-├── qwenchat/
-    |–– models/  here you would place your models
-│   ├── __init__.py
-│   ├── __main__.py
-│   ├── app.py
-    |–– backends.py
-│   ├── config.py
-│   ├── github_client.py
-│   ├── ui.py
-│   └── tools.py
-├── docs/
-├── requirements.txt
-├── pyproject.toml
-├── LICENSE
-└── README.md
-```
+| Variable | Default | Effect |
+| --- | --- | --- |
+| QWENCHAT_N_CTX | 4096 | GGUF context length |
+| QWENCHAT_SKIP_WARMUP | unset | Set to 1 to skip warm-up |
+| QWENCHAT_HISTORY_DIR | ~/.qwenchat/history | History location |
+| QWENCHAT_LOCAL_ROOT | . | Local tools sandbox root |
 
 ---
 
@@ -156,11 +191,3 @@ Qwen ✦ ⚙ Calling GitHub tool: list_repos
 ## License
 
 MIT License – feel free to use, modify and distribute.
-
----
-
-## Credits
-
-- Model: [orcarouter/Qwen3.8-27B-Uncensored-MLX](https://huggingface.co/orcarouter/Qwen3.8-27B-Uncensored-MLX)
-- Base model: Qwen3.8-27B by Alibaba
-- Built with [mlx-vlm](https://github.com/Blaizzy/mlx-vlm)
