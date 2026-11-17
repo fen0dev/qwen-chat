@@ -81,7 +81,12 @@ class GGUFBackend(BaseBackend):
             top_p=top_p,
             stream=True,
         )
+
+        self.last_usage = None
         for chunk in stream:
+            usage = chunk.get("usage")
+            if usage:
+                self.last_usage = usage
             delta = chunk["choices"][0].get("delta", {})
             content = delta.get("content")
             if content:

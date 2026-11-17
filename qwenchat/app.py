@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import os
 import gc
+import re
 import logging
 import sys
 import time
@@ -23,6 +25,9 @@ from .ui import (
     user_prompt,
     print_tool_call,
     print_status_bar,
+    print_queue_status,
+    print_queue_added,
+    print_tool_result,
 )
 from .github_client import GitHubClient
 from .tools import TOOLS_PROMPT, parse_tool_call, execute_tool
@@ -110,8 +115,30 @@ PRESETS = {
     """
 }
 
+def strip_thinking(text: str) -> str:
+    return re.sub(
+        r"<thinking>.*?</thinking>\s*",
+        "", 
+        text, 
+        flags=re.DOTALL
+    ).strip()
+
+def maybe_compact(conv: Conversation, threshold: int = 40, keep:int = 20) -> None:
+    if conv.message_count <= threshold:
+        return
+    old = conv.messages[:-keep]
+    conv.messages = conv.messages[-keep:]
+    note = f"Compacted {len(old)} older messages into rolling memory."
+
+    from .memory.history_store import append_rolling_note
+    append_rolling_note(note)
+    print_info(note)
+
 def build_system_message(params: GenerationParams) -> dict:
-    base = """
+    from .tools.local_tools import get_local_root
+    root = get_local_root()
+
+    base = f"""
     You are a senior software engineer. Your primary job is to help with real coding work: reading code, debugging, designing, refactoring, and implementing correctly.
 
     Core principles:
@@ -149,6 +176,11 @@ def build_system_message(params: GenerationParams) -> dict:
     - Use GitHub tools when repository context is needed.
     - Do not guess file contents if you can read them.
     - Prefer evidence from the repo over general knowledge when they conflict.
+
+    Local file tools:
+    - The sandbox root is: {root}
+    - Paths passed to list_dir / read_file / search_local must be relative to this root.
+    - If the user gives an absolute path outside the root, tell them to run /root <path> first.
     """
 
     thinking = ""
@@ -254,13 +286,27 @@ def stream_reply(
         return "", False
     
     elapsed = time.perf_counter() - start
-    text = "".join(full).strip()
-    # rough token estimate
-    tokens = max(1, len(text.split()))
-    tps = tokens / elapsed if elapsed > 0 else 0
+    
+    raw = "".join(full)
+    thinking_match = re.search(
+        r"<thinking>(.*?)</thinking>", 
+        "".join(full), 
+        re.DOTALL
+    )
+    if thinking_match:
+        print(f"\n{C.MUTED}{thinking_match.group(1).strip()}{C.RESET}")
+    text = strip_thinking(raw)
+
+    usage = getattr(engine, "last_usage", None)
+    if usage and isinstance(usage, dict):
+        token_est = usage.get("completion_tokens") or usage.get("total_tokens") or max(1, len(text) // 4)
+    else:
+        token_est = max(1, len(text) // 4)
+
+    tps = token_est / elapsed if elapsed > 0 else 0
 
     if text and not interrupted:
-        print(f"{C.GRAY}  ({tps:.1f} tokens){C.RESET}")
+        print(f"{C.MUTED}  ·  {token_est} tok  ·  {tps:.1f} tok/s{C.RESET}")
 
     return text, interrupted
 
@@ -300,15 +346,28 @@ def generate_with_tools(
                 conv.add_assistant(reply)
                 return True
 
-            if not tool_call or github is None:
+            if not tool_call:
                 conv.add_assistant(reply)
                 return False
 
             # Tool call path
             tool_name, args = tool_call
-            print_tool_call(round_idx + 1, tool_name)
 
+            from .tools import TOOLS
+            tool = TOOLS.get(tool_name.lower().strip())
+
+            if tool and tool.needs_github and github is None:
+                conv.add_assistant(reply)
+                conv.add_user(
+                    f"Tool `{tool_name}` requires a Github connection."
+                    "Continue without it or ask the user to run `github`."
+                )
+                messages = [system_message] + conv.messages
+                continue
+                
+            print_tool_call(round_idx + 1, tool_name)
             tool_result = execute_tool(github, tool_name, args)
+            print_tool_result(tool_result)
 
             conv.add_assistant(reply)
             conv.add_user(
@@ -362,8 +421,9 @@ def run(
             github = None
 
     print_separator()
-    print_info(f"⚙️  Loading {backend.upper()} model from:\n   {model_path}")
-    print_info("🚀 Loading... please wait")
+    print_info(f"Loading {backend.upper()} model from:\n   {model_path}")
+    print_info("Loading... please wait")
+    print_info(f"Local root: {get_local_root()}")
 
     try:
         engine = create_backend(backend, model_path)
@@ -372,28 +432,24 @@ def run(
         logger.exception("Model loading failed")
         sys.exit(1)
 
-    print_info("🐣 Running warm-up...")
-    t0 = time.perf_counter()
-    try:
-        warm = engine.generate(
-            [
-                {
-                    "role": "user",
-                    "content": "Hi",
-                },
-            ],
-            max_tokens=16,
-            temperature=0.0,
-            top_p=1.0,
-        )
+    skip_warmup = os.getenv("QWENCHAT_SKIP_WARMUP", "").lower() in {"1", "true", "yes"}
+    if not skip_warmup:
+        print_info("Running warm-up...")
+        t0 = time.perf_counter()
+        try:
+            engine.generate(
+                [{"role": "user", "content": "Hi"}],
+                max_tokens=4,
+                temperature=0.0,
+                top_p=1.0,
+            )
+            print_success(f"Warm-up completed ({time.perf_counter() - t0:.1f}s)")
+        except Exception as exc:
+            print_warning(f"Warm-up failed (model may still work): {exc}")
+    else:
+        print_info("Warm-up skipped")
 
-        dt = time.perf_counter() -t0
-        print_success(f"✓ Warm-up ok ({dt:.1f}s)")
-    except Exception as exc:
-        print_warning(f"Warm-up failed (model may still work): {exc}")
-
-
-    print_success("✓ Model loaded successfully")
+    print_success("Model loaded successfully")
     print_separator()
     print_help()
     print_separator()
@@ -401,16 +457,22 @@ def run(
     ensure_history_dirs()
     pruned = prune_old_sessions()
     if pruned:
-        print_info(f"Pruned {pruned} sessions file(s) older than a week 🥵")
+        print_info(f"Pruned {pruned} session file(s) older than a week")
 
     # ------------------------------------------------------------------
     # Session state
     # ------------------------------------------------------------------
     input_q = InputQueue()
+
+    def _on_queued(text: str) -> None:
+        print_queue_added(text)
+
+    input_q.set_on_enqueue(_on_queued)
     input_q.start()
 
     params = GenerationParams()
     conv = Conversation(title=model_name or "Chat")
+    last_user_msg: Optional[str] = None
 
     system_message = build_system_message(params)
 
@@ -420,8 +482,7 @@ def run(
             "role": "system",
             "content": system_message["content"] + "\n\n" + resume,
         }
-
-        print_info("👻 loaded prior context (summary + active plans).")
+        print_info("Loaded prior context (summary + active plans).")
 
     print_info("Input queue active — you can type while the model is generating.\n")
 
@@ -429,13 +490,13 @@ def run(
         while True:
             pending = input_q.pending()
             if pending:
-                print(f"{C.GRAY}({pending} queued){C.RESET}")
+                print_queue_status(pending)
 
             try:
                 print(user_prompt(), end="", flush=True)
                 user_input = input_q.get(block=True)
             except (KeyboardInterrupt, EOFError):
-                print(f"\n\n{C.MAGENTA}Session ended. Goodbye.{C.RESET}\n")
+                print(f"\n\n{C.MAGENTA}Session ended. Goodbye{C.RESET}\n")
                 break
 
             user_input = user_input.strip()
@@ -446,12 +507,13 @@ def run(
 
             # -------------------- commands --------------------
             if cmd in {"exit", "quit", "q"}:
-                print(f"\n{C.MAGENTA}Session ended. Goodbye.{C.RESET}\n")
+                print(f"\n{C.MAGENTA}Session ended. Goodbye{C.RESET}\n")
                 break
 
             if cmd == "clear":
                 conv.clear()
-                print(f"{C.YELLOW}→ Conversation memory cleared.{C.RESET}\n")
+                last_user_msg = None
+                print_success("Conversation memory cleared.")
                 continue
 
             if cmd == "help":
@@ -470,7 +532,9 @@ def run(
                     continue
                 ok, msg = set_local_root(parts[1])
                 if ok:
-                    print_success(f"✓ {msg}")
+                    print_success(msg)
+                    # refresh system message so the model sees the new root
+                    system_message = build_system_message(params)
                 else:
                     print_error(msg)
                 continue
@@ -506,28 +570,26 @@ def run(
                     gc.collect()
                     engine = create_backend(new_backend, new_path)
                     model_name = new_name
-                    print_success(f"✓ Switched to {new_name}")
+                    print_success(f"Switched to {new_name}")
                 except Exception as exc:
                     print_error(f"Failed to switch model: {exc}")
                 continue
-
 
             if cmd.startswith("/preset") or cmd.startswith("preset"):
                 name = user_input.split(maxsplit=1)[-1].strip().lower()
                 if name not in PRESETS:
                     print_error(f"Unknown preset. Available: {', '.join(PRESETS.keys())}")
                     continue
-                # override the base system content (keep tools + resume)
                 system_message = {
                     "role": "system",
                     "content": PRESETS[name] + "\n\n" + TOOLS_PROMPT,
                 }
-                print_success(f"✓ Preset set to '{name}'")
+                print_success(f"Preset set to '{name}'")
                 continue
 
             if cmd == "save":
                 path = conv.save()
-                print_success(f"✓ Saved to {path}")
+                print_success(f"Saved to {path}")
                 continue
 
             if cmd.startswith("load "):
@@ -537,7 +599,8 @@ def run(
                     path = path.with_suffix(".json")
                 try:
                     conv = Conversation.load(path)
-                    print_success(f"✓ Loaded: {conv.summary()}")
+                    last_user_msg = None
+                    print_success(f"Loaded: {conv.summary()}")
                 except Exception as exc:
                     print_error(f"Failed to load: {exc}")
                 continue
@@ -554,7 +617,7 @@ def run(
 
             if cmd in {"/prune", "prune"}:
                 n = prune_old_sessions()
-                print_success(f"✓ Pruned {n} old session file(s)")
+                print_success(f"Pruned {n} old session file(s)")
                 continue
 
             if cmd in {"/resume", "resume"}:
@@ -565,12 +628,10 @@ def run(
                     print(resume)
                 continue
 
-            last_user_msg: Optional[str] = None
             if cmd == "retry":
                 if not last_user_msg:
-                    print_info("Nothing to retry 🤷🏻‍♂️")
+                    print_info("Nothing to retry.")
                     continue
-                # remove last assistant message if present so we regenerate cleanly
                 if conv.messages and conv.messages[-1].get("role") == "assistant":
                     conv.messages.pop()
                 generate_with_tools(
@@ -588,22 +649,19 @@ def run(
                 if not items:
                     print_info("Queue is empty.")
                 else:
-                    print(f"{C.YELLOW}Queued messages:{C.RESET}")
-                    for i, msg in enumerate(items, 1):
-                        preview = msg if len(msg) < 80 else msg[:77] + "..."
-                        print(f"  {i}. {preview}")
+                    print_queue_status(len(items), items)
                 continue
 
             if cmd in {"/qclear", "qclear"}:
-                n = input_q.clear()
-                print_success(f"✓ Cleared {n} queued message(s)")
+                dropped = input_q.clear()
+                print_success(f"Cleared {dropped} queued message(s).")
                 continue
 
             if cmd in {"/status", "status"}:
                 print_status_bar(
                     model_name=model_name,
                     github_user=getattr(github, "username", None) if github else None,
-                    masg_count=conv.message_count,
+                    msg_count=conv.message_count,
                     queue=input_q.pending(),
                     plans=plan_progress_summary(),
                 )
@@ -614,47 +672,48 @@ def run(
                 if not name.endswith(".md"):
                     name += ".md"
                 path = Path.home() / ".qwenchat" / name
+                path.parent.mkdir(parents=True, exist_ok=True)
                 lines = [f"# {conv.title}\n"]
                 for m in conv.messages:
                     role = m.get("role", "").upper()
                     lines.append(f"## {role}\n{m.get('content', '')}\n")
-                path.write_text("\n".join(lines), encoding='utf-8')
-                print_success(f"✓ Exported to {path}")
+                path.write_text("\n".join(lines), encoding="utf-8")
+                print_success(f"Exported to {path}")
                 continue
 
             if cmd in {"/copy", "copy"}:
-                last = next((m["content"] for m in reversed(conv.messages) if m.get("role") == "assistant"), None)
+                last = next(
+                    (m["content"] for m in reversed(conv.messages) if m.get("role") == "assistant"),
+                    None,
+                )
                 if not last:
                     print_info("No assistant message to copy.")
                     continue
                 try:
                     import subprocess
                     subprocess.run(["pbcopy"], input=last.encode(), check=True)
-                    print_success("✓ Copied last answer to clipboard")
+                    print_success("Copied last answer to clipboard")
                 except Exception as exc:
                     print_error(f"Copy failed: {exc}")
                 continue
 
             if cmd in {"/compact", "compact"}:
-                if conv.messages < 8:
-                    print_info("Conversation is still short - nothing to compact.")
+                if conv.message_count < 8:
+                    print_info("Conversation is still short — nothing to compact.")
                     continue
-                # keep th elast 6 messages, summarize the rest into rolling summary
                 keep = conv.messages[-6:]
                 older = conv.messages[:-6]
                 summary_lines = []
                 for m in older:
                     role = m.get("role", "")
-                    text = (m.get("content") or "")[:200].replace("\n", "")
+                    text = (m.get("content") or "")[:200].replace("\n", " ")
                     summary_lines.append(f"{role}: {text}")
                 note = "Compacted older turns:\n" + "\n".join(summary_lines[-20:])
-
                 from .memory.history_store import append_rolling_note
                 append_rolling_note(note)
                 conv.messages = keep
-                print_success(f"✓ Compacted. Kept last {len(keep)} messages.")
+                print_success(f"Compacted. Kept last {len(keep)} messages.")
                 continue
-
 
             if handle_runtime_command(user_input, params):
                 if cmd.startswith(("/think", "think")):
@@ -674,10 +733,13 @@ def run(
                 model_name=model_name,
             )
 
+            if not interrupted:
+                maybe_compact(conv)
+
             if interrupted:
                 pending = input_q.pending()
                 if pending:
-                    print_info(f"Continuing with next queued message ({pending} waiting)...")
+                    print_queue_status(pending)
                 else:
                     print_info("No queued messages.")
 

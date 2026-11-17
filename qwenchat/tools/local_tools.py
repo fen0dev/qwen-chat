@@ -31,7 +31,8 @@ def _resolve_safe(path_str: str) -> Optional[Path]:
     if not path_str:
         return None
     try:
-        p = (_LOCAL_ROOT / path_str).resolve()
+        raw = Path(path_str).expanduser()
+        p = raw.resolve() if raw.is_absolute() else (_LOCAL_ROOT / raw).resolve()
         p.relative_to(_LOCAL_ROOT)
         return p
     except (ValueError, OSError):

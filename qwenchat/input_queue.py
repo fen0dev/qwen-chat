@@ -2,10 +2,11 @@
 
 from __future__ import annotations
 
+from gc import callbacks
 import sys
 import threading
 import queue
-from typing import Optional
+from typing import Callable, Optional
 
 class InputQueue:
     """
@@ -17,6 +18,10 @@ class InputQueue:
         self._queue: queue.Queue[str] = queue.Queue()
         self._stop_event = threading.Event()
         self._thread: Optional[threading.Thread] = None
+        self._on_enqueue: Optional[Callable[[str], None]] = None # callback for new messages
+
+    def set_on_enqueue(self, callback: Callable[[str], None]) -> None:
+        self._on_enqueue = callback
 
     def start(self) -> None:
         if self._thread and self._thread.is_alive():
@@ -46,6 +51,11 @@ class InputQueue:
             text = line.rstrip("\n")
             if text:
                 self._queue.put(text)
+                if self._on_enqueue:
+                    try:
+                        self._on_enqueue(text)
+                    except Exception:
+                        pass
 
     def get(self, block: bool = True, timeout: Optional[float] = None) -> str:
         """Get the next message (blocking by default)."""
