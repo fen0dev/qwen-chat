@@ -2,10 +2,25 @@
 
 from __future__ import annotations
 
+import gc
+import os
 from pathlib import Path
 from typing import Any, Dict, Generator, List
 
 from .base import BaseBackend
+
+def _mlx_max_tokens() -> int:
+    return int(os.getenv("QWENCHAT_MAX_TOKENS", "512"))
+
+def _clear_mlx_cache() -> int:
+    try:
+        import mlx.core as mx
+        if hasattr(mx, "clear_cache"):
+            mx.clear_cache()
+    except Exception:
+        pass
+
+    gc.collect()
 
 class MLXBackend(BaseBackend):
     def __init__(self, model_path: Path):
@@ -18,6 +33,7 @@ class MLXBackend(BaseBackend):
         self._generate = generate
         self._stream_generate = stream_generate
         self._apply_chat_template = apply_chat_template
+        self.last_usage = None
 
     def _build_prompt(self, messages: List[Dict[str, str]]) -> str:
         return self._apply_chat_template(
@@ -26,6 +42,9 @@ class MLXBackend(BaseBackend):
             messages,
             add_generation_prompt=True,
         )
+
+    def _cap(self, max_tokens: int) -> int:
+        return max(16, min(max_tokens, _mlx_max_tokens()))
 
     def generate(
         self,
@@ -39,13 +58,15 @@ class MLXBackend(BaseBackend):
             self.model,
             self.processor,
             prompt,
-            max_tokens=max_tokens,
+            max_tokens=self._cap(max_tokens),
             temp=temperature,
             top_p=top_p,
             verbose=False,
         )
 
-        return self._extract_text(result)
+        text = self._extract_text(result)
+        _clear_mlx_cache()
+        return text
     
     def stream(
         self,
@@ -55,17 +76,27 @@ class MLXBackend(BaseBackend):
         top_p: float,
     ) -> Generator[str, None, None]:
         prompt = self._build_prompt(messages)
-        for chunk in self._stream_generate(
-            self.model,
-            self.processor,
-            prompt,
-            max_tokens=max_tokens,
-            temperature=temperature,
-            top_p=top_p,
-        ):
-            text = self._extract_text(chunk, strip=False)
-            if text:
-                yield text
+        try:
+            for chunk in self._stream_generate(
+                self.model,
+                self.processor,
+                prompt,
+                max_tokens=self._cap(max_tokens),
+                temperature=temperature,
+                top_p=top_p,
+            ):
+                text = self._extract_text(chunk, strip=False)
+                if text:
+                    yield text
+        finally:
+            _clear_mlx_cache()
+
+    def unload(self) -> None:
+        if hasattr(self, "model"):
+            del self.model
+        if hasattr(self, "processor"):
+            del self.processor
+        _clear_mlx_cache()
 
     @staticmethod
     def _extract_text(result: Any, strip: bool = True) -> str:
