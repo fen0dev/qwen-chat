@@ -171,6 +171,7 @@ TOP_P = 0.9
 | QWENCHAT_SKIP_WARMUP | unset | Set to 1 to skip warm-up |
 | QWENCHAT_HISTORY_DIR | ~/.qwenchat/history | History location |
 | QWENCHAT_LOCAL_ROOT | . | Local tools sandbox root |
+| QWENCHAT_MLX_MAX_TOKENS | . | Local set token for harder tasks |
 
 ---
 
