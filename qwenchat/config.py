@@ -17,11 +17,11 @@ def _p(key: str, fallback: str = "") -> Path:
 LFM_Q4_PATH: Final[Path] = _p("LFM_Q4_PATH")
 QWEN_4BIT_PATH: Final[Path] = _p("QWEN_4BIT_PATH")
 #QWEN_OPUS: Final[Path] = _p("QWEN_OPUS")
-QWEN_FABLE: Final[Path] = _p("QWEN_FABLE")
+#QWEN_FABLE: Final[Path] = _p("QWEN_FABLE")
 
 MODELS: Final[Dict[str, Tuple[str, Path]]] = {
     "Qwen3.8-27B-Uncensored (4-bit MLX)": ("mlx", QWEN_4BIT_PATH),
-    "Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M)": ("gguf", QWEN_FABLE),
+    #"Qwen3.6-27B-Claude-Fable-Fusion-Uncensored (Q4_K_M)": ("gguf", QWEN_FABLE),
     "LFM2.5-24B-A2B-Uncensored (Q4_K_M)": ("gguf", LFM_Q4_PATH),
 }
 
