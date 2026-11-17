@@ -132,7 +132,7 @@ def print_warning(message: str) -> None:
     print(f"  {C.WARNING}! {message}{C.RESET}")
 
 def user_prompt() -> str:
-    return f"\n  {C.SUCCESS}{C.BOLD}You{C.RESET}  "
+    return f"\n  {C.SUCCESS}{C.BOLD}You •{C.RESET}  "
 
 def assistant_prompt(model_name: str | None = None) -> str:
     label = "Qwen"
@@ -152,3 +152,23 @@ def print_tool_result(text: str, max_lines: int = 12) -> None:
         print(f"  {C.MUTED}│ {line}{C.RESET}")
     if len(lines) > max_lines:
         print(f"  {C.MUTED}│ … ({len(lines) - max_lines} more lines){C.RESET}")
+
+def print_queue_status(count: int, items: list[str] | None = None) -> None:
+    """Show a compact queue indicator, or a full list if items are given"""
+    if count <= 0:
+        return
+    if items is None:
+        print(f"  {C.WARNING}{C.BOLD}↑{C.RESET} {C.WARNING}{count} queued{C.RESET}")
+        return
+    print(f"  {C.WARNING}{C.BOLD}Queue ({count}){C.RESET}")
+    for i, text in enumerate(items, 1):
+        preview = text.replace("\n", " ")
+        if len(preview) > 60:
+            preview = preview[:57] + "..."
+        print(f"  {C.MUTED}{i:>2}.{C.RESET} {C.TEXT}{preview}{C.RESET}")
+
+def print_queue_added(preview: str) -> None:
+    short = preview.replace("\n", " ")
+    if len(short) > 48:
+        short = short[:45] + "..."
+    print(f"  {C.MUTED}queued -> {short}{C.RESET}")

@@ -90,7 +90,7 @@ class GitHubClient:
             except OSError as exc:
                 print_warning(f"Could not save token to disk: {exc}")
 
-            print_success(f"✓ Authenticated as {C.BOLD}{self.username}{C.RESET}")
+            print_success(f"Authenticated as {C.BOLD}{self.username}{C.RESET}")
             return True
 
         print_error("Invalid token or network error.")
