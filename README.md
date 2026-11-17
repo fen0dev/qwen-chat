@@ -10,6 +10,10 @@
 ![Platform](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-lightgrey?style=for-the-badge)
 ![Backends](https://img.shields.io/badge/Backends-MLX%20%7C%20GGUF-orange?style=for-the-badge)
 
+<img src="/docs/Screenshot_2026-11-17_18.31.06.png" alt="QwenChat" width="600">
+
+<img src="/docs/Screenshot_2026-11-17_19.24.24.png" alt="QwenChat" width="600">
+
 </div>
 
 ---
