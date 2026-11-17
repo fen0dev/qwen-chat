@@ -1,16 +1,29 @@
-"""MLX backend."""
+"""MLX backend with memory caps, cache control, and optional chunked prefill."""
 
 from __future__ import annotations
 
 import gc
 import os
 from pathlib import Path
-from typing import Any, Dict, Generator, List
+from typing import Any, Dict, Generator, List, Optional
 
 from .base import BaseBackend
 
+def _int_env(name: str, default: int) -> int:
+    raw = os.getenv(name, "").strip()
+    if not raw:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
 def _mlx_max_tokens() -> int:
-    return int(os.getenv("QWENCHAT_MAX_TOKENS", "512"))
+    return max(16, _int_env("QWENCHAT_MLX_MAX_TOKENS", 512))
+
+def _prefill_step() -> Optional[int]:
+    step = _int_env("QWENCHAT_MLX_PREFILL_STEP", 0)
+    return step if step >= 64 else None
 
 def _clear_mlx_cache() -> None:
     try:
@@ -33,7 +46,7 @@ class MLXBackend(BaseBackend):
         self._generate = generate
         self._stream_generate = stream_generate
         self._apply_chat_template = apply_chat_template
-        self.last_usage = None
+        self.last_usage: Optional[Dict[str, int]] = None
 
     def _build_prompt(self, messages: List[Dict[str, str]]) -> str:
         return self._apply_chat_template(
@@ -46,6 +59,18 @@ class MLXBackend(BaseBackend):
     def _cap(self, max_tokens: int) -> int:
         return max(16, min(max_tokens, _mlx_max_tokens()))
 
+    def _gen_kwargs(self, max_tokens: int, temperature: float, top_p: float) -> Dict[str, Any]:
+        kwargs: Dict[str, Any] = {
+            "max_tokens": self._cap(max_tokens),
+            "temperature": temperature,
+            "top_p": top_p,
+        }
+
+        step = _prefill_step()
+        if step:
+            kwargs["prefill_step_size"] = step
+        return kwargs
+
     def generate(
         self,
         messages: List[Dict[str, str]],
@@ -54,14 +79,13 @@ class MLXBackend(BaseBackend):
         top_p: float,
     ) -> str:
         prompt = self._build_prompt(messages)
+        kwargs = self._gen_kwargs(max_tokens, temperature, top_p)
         result = self._generate(
             self.model,
             self.processor,
             prompt,
-            max_tokens=self._cap(max_tokens),
-            temp=temperature,
-            top_p=top_p,
             verbose=False,
+            **kwargs,
         )
 
         text = self._extract_text(result)
@@ -76,20 +100,30 @@ class MLXBackend(BaseBackend):
         top_p: float,
     ) -> Generator[str, None, None]:
         prompt = self._build_prompt(messages)
+        kwargs = self._gen_kwargs(max_tokens, temperature, top_p)
+        self.last_usage = None
         try:
             for chunk in self._stream_generate(
                 self.model,
                 self.processor,
                 prompt,
-                max_tokens=self._cap(max_tokens),
-                temperature=temperature,
-                top_p=top_p,
+                **kwargs,
             ):
                 text = self._extract_text(chunk, strip=False)
                 if text:
                     yield text
         finally:
             _clear_mlx_cache()
+
+    def memory_stats(self) -> Dict[str, float]:
+        try:
+            import mlx.core as mx
+            return {
+                "active_gb": mx.metal.get_active_memory() / 1e9,
+                "peak_gb": mx.metal.get_peak_memory() / 1e9,
+            }
+        except Exception:
+            return {}
 
     def unload(self) -> None:
         if hasattr(self, "model"):
