@@ -92,14 +92,14 @@ def prompt_model_selection():
                 continue
 
             display_name = custom_path.name
-            print_success(f"✓ Using custom model ({backend}): {custom_path}")
+            print_success(f"Using custom model ({backend}): {custom_path}")
             return display_name, backend, custom_path   # ← 3 valori
 
         if choice.isdigit():
             idx = int(choice) - 1
             if 0 <= idx < len(available):
                 name, backend, path = available[idx]
-                print_success(f"✓ Selected: {name}")
+                print_success(f"Selected: {name}")
                 return name, backend, path              # ← 3 values
             print_error("Invalid number.")
             continue

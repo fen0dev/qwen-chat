@@ -252,6 +252,14 @@ def handle_runtime_command(cmd: str, params: GenerationParams) -> bool:
 
     return False
 
+def _is_oom(exc: Exception) -> bool:
+    msg = str(exc)
+    return (
+        "Insufficient Memory" in msg
+        or "OutOfMemory" in msg
+        or "kIOGPUCommandBufferCallbackErrorOutOfMemory" in msg
+    )
+
 def stream_reply(
     engine,
     messages: list,
@@ -259,6 +267,7 @@ def stream_reply(
     temperature: float,
     top_p: float,
     model_name: str | None = None,
+    _retry: bool = True,
 ) -> tuple[str, bool]:
     """
     Stream a reply.
@@ -282,7 +291,22 @@ def stream_reply(
         interrupted = True
         print(f"\n{C.YELLOW}⚡ Generation interrupted{C.RESET}")
     except Exception as exc:
-        print_error(f"\nGeneration error: {exc}")
+        if _is_oom(exc) and _retry and max_tokens > 128:
+            print_warning("\nGPU out of memory — retrying with fewer tokens")
+            return stream_reply(
+                engine,
+                messages,
+                max_tokens=max(128, max_tokens // 2),
+                temperature=temperature,
+                top_p=top_p,
+                model_name=model_name,
+                _retry=False,
+            )
+        if _is_oom(exc):
+            print_error("\nGPU out of memory.")
+            print_info("Try: /tokens 256  ·  /compact  ·  restart with QWENCHAT_MLX_MAX_TOKENS=256")
+        else:
+            print_error(f"\nGeneration error: {exc}")
         return "", False
     
     elapsed = time.perf_counter() - start
