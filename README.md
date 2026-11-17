@@ -1,5 +1,3 @@
-<div align="center">
-
 # QwenChat
 
 **A fast, local terminal chat client for Apple Silicon**  
@@ -10,7 +8,11 @@
 ![Platform](https://img.shields.io/badge/Platform-macOS%20(Apple%20Silicon)-lightgrey?style=for-the-badge)
 ![Backends](https://img.shields.io/badge/Backends-MLX%20%7C%20GGUF-orange?style=for-the-badge)
 
-</div>
+![QwenChat](https://raw.githubusercontent.com/fen0dev/qwen-chat/docs/Screenshot_2026-11-17_18.31.06.png)
+
+![QwenChat](https://raw.githubusercontent.com/fen0dev/qwen-chat/docs/Screenshot_2026-11-17_19.24.24)
+
+
 
 ---
 
@@ -58,7 +60,7 @@ pip install -r requirements.txt
 
 ## Usage
 
-Copy ```.env.local``` and set your model paths:
+Copy `.env.local` and set your model paths:
 
 ```bash
 # Example:
@@ -74,6 +76,7 @@ python3 -m qwenchat
 pip install -e .
 qwenchat
 ```
+
 ---
 
 ### Download the model
@@ -90,21 +93,21 @@ hf download orcarouter/Qwen3.8-27B-Uncensored-MLX \
 
 ### Available commands inside the chat
 
-| Command | Description |
-| --- | --- |
-| /models | List models and switch by number |
-| /root [path] | Show or set local file sandbox root |
-| /preset coding\|review\|debug\|concise\|architect | Switch system style |
-| /status | Session status |
-| /compact | Summarize older turns into rolling memory |
-| /export [name] | Export conversation to Markdown |
-| /copy | Copy last answer to clipboard |
-| retry | Regenerate the last answer |
-| save / load <file> / history | Conversation persistence |
-| /prune | Delete sessions older than 7 days |
-| /resume | Show prior context |
-| /temp /tokens /top_p /think /rounds /params | Runtime generation settings |
-| clear / help / exit | Standard controls |
+| Command                                       | Description                               |
+| --------------------------------------------- | ----------------------------------------- |
+| /models                                       | List models and switch by number          |
+| /root [path]                                  | Show or set local file sandbox root       |
+| /preset coding|review|debug|concise|architect | Switch system style                       |
+| /status                                       | Session status                            |
+| /compact                                      | Summarize older turns into rolling memory |
+| /export [name]                                | Export conversation to Markdown           |
+| /copy                                         | Copy last answer to clipboard             |
+| retry                                         | Regenerate the last answer                |
+| save / load / history                         | Conversation persistence                  |
+| /prune                                        | Delete sessions older than 7 days         |
+| /resume                                       | Show prior context                        |
+| /temp /tokens /top_p /think /rounds /params   | Runtime generation settings               |
+| clear / help / exit                           | Standard controls                         |
 
 ---
 
@@ -180,6 +183,7 @@ TOP_P = 0.9
 When you send a prompt the model will reply first with a `MallockStackLogging` warning, which is completely harmless, and then give you full output:
 
 Example: 
+
 ```
 You ✦ List my repositories
 Qwen ✦ Python(82222) MallocStackLogging: can't turn off malloc stack logging because it was not enabled.
