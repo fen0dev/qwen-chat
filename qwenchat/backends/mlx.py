@@ -12,7 +12,7 @@ from .base import BaseBackend
 def _mlx_max_tokens() -> int:
     return int(os.getenv("QWENCHAT_MAX_TOKENS", "512"))
 
-def _clear_mlx_cache() -> int:
+def _clear_mlx_cache() -> None:
     try:
         import mlx.core as mx
         if hasattr(mx, "clear_cache"):
